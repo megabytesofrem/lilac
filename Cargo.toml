@@ -1,0 +1,8 @@
+[package]
+name = "lilac"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+logos = "0.16.1"
+winnow = "0.7.13"
