@@ -6,12 +6,12 @@ use crate::ast::types::Type;
 pub struct Selector(pub String);
 
 /// Represents an Objective-C style message of the format:
-/// `@(target selector-name arg1:val)`
+/// `[target selector-name arg1:val arg2:val2 ...]`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
-    pub selector: Selector,
     pub target: String,
-    pub args: Vec<(String, Type)>,
+    pub selector: Selector,
+    pub keyword_args: Vec<(String, Type)>,
     pub return_type: Option<Type>,
 }
 

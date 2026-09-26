@@ -34,8 +34,8 @@ pub enum Visibility {
 pub enum Expr {
     Lit(Literal),
     Ident(String),
+
     Array(Vec<Expr>),
-    Set(Vec<Expr>),
     Tuple(Vec<Expr>),
 
     Binary {

@@ -76,7 +76,7 @@ fn p_message_signature<'s>(input: &mut &'s str) -> Result<message::Message> {
                 .first()
                 .map(|(name, _)| name.clone())
                 .unwrap_or_default(),
-            args,
+            keyword_args: args,
             return_type: None,
         })
         .parse_next(input)
