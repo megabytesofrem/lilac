@@ -74,6 +74,11 @@ def i32.squared (self) -> self = self * self
 def i32.cubed (self) -> self = self * self * self
 ```
 
+Likewise, this shorthand also works on specific protocol extensions:
+```
+def Ctx.(Reader.ask) (self) -> Ctx = self.ctx
+```
+
 ### Typeclasses
 Typeclasses _are_ protocols, and their methods are messages.
 
