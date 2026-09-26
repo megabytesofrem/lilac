@@ -20,22 +20,28 @@ def insert-item-if-not-existing[a] (l: List[a], v: a) =
     then List.insert-elem l v
     else List.get l v
 
+def replace-array (arr: #[i32], with: #[i32]) =
+  Array.swap arr with
 
 -- Generic function
 def id-of[a](a': a) = a'
 ```
 
 ### Objective C style OOP
-Lilac encourages the usage of Objective C/Smalltalk style messaging between immutable objects
+Lilac encourages the usage of Objective C/Smalltalk style messaging between immutable objects.
+
+Protocols expose messages, and the `implement` keyword implements a protocol
+on a type.
 
 ```
-struct Window
-  private width: i32
-  private height: i32
+struct Win
+  title: str
+  width: i32
+  height: i32
 end
 
 struct App
-  private win: Window
+  win: Win
 end
 
 protocol App'
@@ -46,20 +52,33 @@ implement App' on App
   message get-window (self: App) = self.win
 end
 
-protocol Window'
-  message resize (self: Window, to-width: i32, height: i32) -> unit
+protocol Win'
+  message resize (self: Win, to-width: i32, and-height: i32) -> Win
+  message titled (self: Win, text: str) -> Win
 end
 
-implement Window' on Window
-  message resize (self: Window, to-width: i32, height: i32) = block
-    self.width = to-width
-    self.height = to-height
-  end
+implement Win' on Win
+  message resize (self: Win, to-width: i32, and-height: i32) = self with
+    { width: to-width, height: and-height }
+
+  message titled (self: Win, text: str) = self with { title: text }
 end
 
--- Use it like so
-def handle_app (self: App) -> unit = block
-  @(@(self get-window) resize to-width:640 height:480)
+-- later on
+let curr-win: Win = [app get-window]
+let win': Win = [[curr-win resize to-width:640 and-height:480] titled text:"A window"]
+```
+
+### Typeclasses
+Typeclasses _are_ protocols, and their methods are messages.
+
+```
+protocol Functor f
+  message map (self: f a, transform: \a -> b) -> f b
+end
+
+protocol Monad m
+  message bind (self: m a, to: \a -> m b) -> m b
 end
 ```
 
@@ -87,13 +106,13 @@ By default Lilac functions are single expressions, but Lilac provides
 blocks to enable complex functions.
 
 ```
-block
-  stmt
-  stmt
+do
+  as
+  bs
 end
 
 -- Example of blocks
-def complex-function () -> unit = block
+def complex-function () -> unit = do
   
 end
 ```

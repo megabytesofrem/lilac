@@ -9,7 +9,7 @@ use crate::ast::types;
 use crate::parser::expression::{p_expr, p_identifier};
 use crate::parser::params;
 
-use super::{lexeme, p_type, symbol};
+use super::{keyword, lexeme, p_type, symbol};
 
 #[rustfmt::skip]
 pub fn struct_field<'s>(input: &mut &'s str) -> Result<(String, types::Type)> {
@@ -36,10 +36,10 @@ pub fn p_struct_def<'s>(input: &mut &'s str) -> Result<Item> {
     // end
 
     lexeme((
-        symbol("struct"),
+        keyword("struct"),
         p_identifier,
         separated(0.., struct_field, symbol(",")),
-        symbol("end"),
+        keyword("end"),
     ))
     .map(|(_, name, fields, _)| Item::StructDef { name, fields })
     .parse_next(input)
@@ -54,10 +54,10 @@ pub fn p_enum_def<'s>(input: &mut &'s str) -> Result<Item> {
     // end
 
     lexeme((
-        symbol("enum"),
+        keyword("enum"),
         p_identifier,
         separated(0.., enum_variant, symbol(",")),
-        symbol("end"),
+        keyword("end"),
     ))
     .map(|(_, name, variants, _)| Item::EnumDef { name, variants })
     .parse_next(input)
@@ -69,7 +69,7 @@ fn p_message_signature<'s>(input: &mut &'s str) -> Result<message::Message> {
     // Message signature definition
     // message <selector> (<params>)
 
-    (symbol("message"), p_identifier, params)
+    (keyword("message"), p_identifier, params)
         .map(|(_, selector, args)| message::Message {
             selector: message::Selector(selector),
             target: args
@@ -125,10 +125,10 @@ pub fn p_protocol_def<'s>(input: &mut &'s str) -> Result<Item> {
     // end
 
     lexeme((
-        symbol("protocol"),
+        keyword("protocol"),
         p_identifier,
         repeat(0.., p_message),
-        symbol("end"),
+        keyword("end"),
     ))
     .map(|(_, name, messages, _)| Item::ProtocolDef { name, messages })
     .parse_next(input)
@@ -143,12 +143,12 @@ pub fn p_implementation<'s>(input: &mut &'s str) -> Result<Item> {
     // end
 
     lexeme((
-        symbol("implement"),
+        keyword("implement"),
         p_identifier, // Protocol name to implement
-        symbol("on"),
+        keyword("on"),
         p_identifier, // Struct on which the protocol is implemented
         repeat(0.., p_message_handler), // Message handlers
-        symbol("end"),
+        keyword("end"),
     ))
     .map(|(_, name, _, target, handlers, _)| Item::ProtocolImpl {
         name,

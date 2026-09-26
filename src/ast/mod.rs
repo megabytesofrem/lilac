@@ -69,10 +69,26 @@ pub enum Expr {
         body: Box<Expr>,
     },
 
+    Assign {
+        target: Box<Expr>,
+        value: Box<Expr>,
+    },
+
     // ML style with expression: <target> with { new_props }
     With {
         target: Box<Expr>,
         new_props: Vec<(String, Expr)>,
+    },
+
+    For {
+        iterator: String,
+        iterable: Box<Expr>,
+        body: Box<Expr>,
+    },
+
+    Until {
+        condition: Box<Expr>,
+        body: Box<Expr>,
     },
 
     Block(Vec<Expr>),

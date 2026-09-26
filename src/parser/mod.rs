@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::Result;
 use winnow::ascii::{multispace0, multispace1};
 use winnow::combinator::delimited;
-use winnow::combinator::{alt, opt, separated};
+use winnow::combinator::{alt, not, opt, separated, terminated};
 use winnow::error::ContextError;
 use winnow::token::{literal, one_of, take_while};
 
@@ -39,6 +39,16 @@ pub fn symbol<'s>(value: &'static str) -> impl Parser<&'s str, &'s str, ContextE
     lexeme(literal(value))
 }
 
+// Like `symbol`, but won't match a prefix of a longer identifier (`in` vs `inner`)
+pub fn keyword<'s>(value: &'static str) -> impl Parser<&'s str, &'s str, ContextError> {
+    lexeme(terminated(
+        literal(value),
+        not(one_of(|c: char| {
+            c.is_alphanumeric() || c == '-' || c == '_' || c == '\''
+        })),
+    ))
+}
+
 #[rustfmt::skip]
 pub fn params<'s>(input: &mut &'s str) -> Result<Vec<(String, types::Type)>> {
     #[rustfmt::skip]
@@ -64,12 +74,14 @@ pub fn params<'s>(input: &mut &'s str) -> Result<Vec<(String, types::Type)>> {
 fn p_named_type<'s>(input: &mut &'s str) -> Result<types::Type> {
     // Named type starting with a uppercase letter, and followed by alphanumeric characters,
     // hyphens and underscores.
-    lexeme((
-        one_of(|c: char| c.is_alphabetic() && c.is_uppercase()),
-        take_while(0.., |c: char| c.is_alphanumeric() || c == '-' || c == '_'),
-        opt(take_while(1.., |c: char| c == '\'')),
-    ))
-    .take()
+    lexeme(
+        (
+            one_of(|c: char| c.is_alphabetic() && c.is_uppercase()),
+            take_while(0.., |c: char| c.is_alphanumeric() || c == '-' || c == '_'),
+            take_while(0.., '\''),
+        )
+            .take(),
+    )
     .map(|s: &str| types::Type::Named(s.to_string()))
     .parse_next(input)
 }
@@ -94,11 +106,8 @@ pub fn p_type<'s>(input: &mut &'s str) -> Result<types::Type> {
         // User-defined types
         p_named_type,
         // Array type
-        lexeme((symbol("["), p_type, symbol("]")))
-            .map(|(_, ty, _)| types::Type::Array(Box::new(ty))),
-        // Set type
         lexeme((symbol("#["), p_type, symbol("]")))
-            .map(|(_, ty, _)| types::Type::Set(Box::new(ty))),
+            .map(|(_, ty, _)| types::Type::Array(Box::new(ty))),
         // Tuple type
         lexeme((
             symbol("#("),

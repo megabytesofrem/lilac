@@ -19,7 +19,6 @@ pub enum Type {
 
     // Array/set/tuple types
     Array(Box<Type>),
-    Set(Box<Type>),
     Tuple(Vec<Type>),
 
     // Raw pointer type: *T
