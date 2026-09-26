@@ -1,44 +1,21 @@
 use winnow::Parser;
 use winnow::Result;
-use winnow::ascii::*;
-use winnow::combinator::Infix;
-use winnow::combinator::{
-    alt, delimited, dispatch, expression, fail, opt, preceded, repeat, separated,
+use winnow::token::{any, one_of, take_while};
+use winnow::{
+    ascii::multispace1,
+    combinator::{
+        Infix, alt, delimited, dispatch, expression, fail, opt, preceded, repeat, separated,
+    },
 };
-use winnow::error::ContextError;
-use winnow::token::any;
-use winnow::token::{literal, one_of, take_while};
+
+use super::{lexeme, p_type, skip_ws, symbol};
 
 use crate::ast::BinaryOp;
 use crate::ast::Expr;
 use crate::ast::Literal;
+use crate::ast::types;
 
-fn ws<'s>(input: &mut &'s str) -> Result<()> {
-    loop {
-        let _ = multispace0.parse_next(input)?;
-        if input.starts_with("--") {
-            let _ = winnow::ascii::till_line_ending.parse_next(input)?;
-        }
-        if !input.starts_with("--") && !input.starts_with(char::is_whitespace) {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
-fn lexeme<'s, O, P>(parser: P) -> impl Parser<&'s str, O, ContextError>
-where
-    P: Parser<&'s str, O, ContextError>,
-{
-    (parser, ws).map(|(value, _)| value)
-}
-
-fn symbol<'s>(value: &'static str) -> impl Parser<&'s str, &'s str, ContextError> {
-    lexeme(literal(value))
-}
-
-pub fn int_literal<'s>(input: &mut &'s str) -> Result<Literal> {
+pub fn p_int_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     fn base_int_literal<'s>(input: &mut &'s str) -> Result<i64> {
         take_while(1.., |c: char| c.is_ascii_digit())
             .take()
@@ -82,7 +59,7 @@ pub fn int_literal<'s>(input: &mut &'s str) -> Result<Literal> {
         .parse_next(input)
 }
 
-pub fn float_literal<'s>(input: &mut &'s str) -> Result<Literal> {
+pub fn p_float_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     // Floating-point literal with digits before and after the decimal point.
     lexeme((
         take_while(1.., |c: char| c.is_ascii_digit()),
@@ -94,8 +71,8 @@ pub fn float_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     .parse_next(input)
 }
 
-pub fn string_literal<'s>(input: &mut &'s str) -> Result<Literal> {
-    // String literal enclosed in double quotes.
+pub fn p_string_literal<'s>(input: &mut &'s str) -> Result<Literal> {
+    // String literal enclosed in double quotes: "hello"
     lexeme((
         symbol("\""),
         take_while(0.., |c: char| c != '"'),
@@ -106,8 +83,8 @@ pub fn string_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     .parse_next(input)
 }
 
-pub fn char_literal<'s>(input: &mut &'s str) -> Result<Literal> {
-    // Character literal enclosed in double single quotes e.g ''a''
+pub fn p_char_literal<'s>(input: &mut &'s str) -> Result<Literal> {
+    // Character literal enclosed in double single quotes: ''a''
     lexeme((
         symbol("''"),
         take_while(1.., |c: char| c != '\''),
@@ -118,7 +95,7 @@ pub fn char_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     .parse_next(input)
 }
 
-pub fn bool_literal<'s>(input: &mut &'s str) -> Result<Literal> {
+pub fn p_bool_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     // Boolean literal is either true, false, yes, or no (objective c style)
     alt((symbol("true"), symbol("false"), symbol("yes"), symbol("no")))
         .take()
@@ -128,18 +105,18 @@ pub fn bool_literal<'s>(input: &mut &'s str) -> Result<Literal> {
 
 pub fn p_literal<'s>(input: &mut &'s str) -> Result<Literal> {
     alt((
-        int_literal,
-        float_literal,
-        string_literal,
-        char_literal,
-        bool_literal,
+        p_int_literal,
+        p_float_literal,
+        p_string_literal,
+        p_char_literal,
+        p_bool_literal,
     ))
     .parse_next(input)
 }
 
 pub fn p_identifier<'s>(input: &mut &'s str) -> Result<String> {
-    // Identifier starting with a letter or underscore, followed by letters, digits, hyphens, or underscores,
-    // and optionally ending with apostrophes.
+    // Identifier: a sequence of letters, digits, hyphens, or underscores, starting with a letter
+    // or underscore, and optionally ending with apostrophes.
 
     // Valid identifiers: hello, _world, foo-bar, baz_qux, quux'
     lexeme((
@@ -152,15 +129,16 @@ pub fn p_identifier<'s>(input: &mut &'s str) -> Result<String> {
     .parse_next(input)
 }
 
-fn p_application_identifier<'s>(input: &mut &'s str) -> Result<String> {
-    (
-        one_of(|c: char| c.is_alphabetic() || c == '_'),
-        take_while(0.., |c: char| c.is_alphanumeric() || c == '-' || c == '_'),
-        opt(take_while(1.., |c: char| c == '\'')),
-    )
-        .take()
-        .map(ToString::to_string)
-        .parse_next(input)
+#[rustfmt::skip]
+pub fn p_optionally_typed_identifier<'s>(input: &mut &'s str) -> Result<(String, Option<types::Type>)> {
+    // Optionally typed identifier: <identifier>[: <type>]
+
+    lexeme((
+        p_identifier,
+        opt((symbol(":"), p_type)),
+    ))
+    .map(|(name, opt_type)| (name, opt_type.map(|(_, ty)| ty)))
+    .parse_next(input)
 }
 
 pub fn p_array_expr<'s>(input: &mut &'s str) -> Result<Expr> {
@@ -177,12 +155,11 @@ pub fn p_array_expr<'s>(input: &mut &'s str) -> Result<Expr> {
 pub fn p_set_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     // Set expression enclosed in #[...], with elements separated by commas.
     lexeme((
-        symbol("#"),
-        symbol("["),
+        symbol("#["),
         separated(0.., p_expr, symbol(",")),
         symbol("]"),
     ))
-    .map(|(_, _, elements, _)| Expr::Set(elements))
+    .map(|(_, elements, _)| Expr::Set(elements))
     .parse_next(input)
 }
 
@@ -190,17 +167,16 @@ pub fn p_tuple_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     // Tuple expression enclosed in #(...), with elements separated by commas.
     // #(1, 2, 3)
     lexeme((
-        symbol("#"),
-        symbol("("),
+        symbol("#("),
         separated(0.., p_expr, symbol(",")),
         symbol(")"),
     ))
-    .map(|(_, _, elements, _)| Expr::Tuple(elements))
+    .map(|(_, elements, _)| Expr::Tuple(elements))
     .parse_next(input)
 }
 
 pub fn p_if_expr<'s>(input: &mut &'s str) -> Result<Expr> {
-    // If expression with optional else branch.
+    // If expression: if <condition> then <then_branch> [else <else_branch>]
     lexeme((
         symbol("if"),
         p_expr,
@@ -218,6 +194,25 @@ pub fn p_if_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     .parse_next(input)
 }
 
+pub fn p_let_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    // Let expression: let <optionally_typed_identifier> = <expr> in <expr>
+    lexeme((
+        symbol("let"),
+        p_optionally_typed_identifier,
+        symbol("="),
+        p_expr,
+        symbol("in"),
+        p_expr,
+    ))
+    .map(|(_, (name, opt_type), _, value, _, body)| Expr::Let {
+        name,
+        opt_type,
+        value: Box::new(value),
+        body: Box::new(body),
+    })
+    .parse_next(input)
+}
+
 pub fn p_member_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     // Member access expression: object.member
     lexeme((p_expr, symbol("."), p_identifier))
@@ -228,7 +223,7 @@ pub fn p_member_expr<'s>(input: &mut &'s str) -> Result<Expr> {
 fn p_application_primary<'s>(input: &mut &'s str) -> Result<Expr> {
     alt((
         p_literal.map(Expr::Lit),
-        p_application_identifier.map(Expr::Ident),
+        p_identifier.map(Expr::Ident),
         p_array_expr,
         p_set_expr,
         p_tuple_expr,
@@ -250,9 +245,12 @@ pub fn p_application_expr<'s>(input: &mut &'s str) -> Result<Expr> {
         ),
     )
         .map(|(callee, arguments)| {
-            arguments.into_iter().fold(callee, |callee, argument| {
-                Expr::Call(Box::new(callee), vec![argument])
-            })
+            arguments
+                .into_iter()
+                .fold(callee, |callee, argument| Expr::Call {
+                    callee: Box::new(callee),
+                    arguments: vec![argument],
+                })
         })
         .parse_next(input)
 }
@@ -266,35 +264,41 @@ pub fn p_selector_call<'s>(input: &mut &'s str) -> Result<Expr> {
 
     // Objective-C style selector call: tgt.@(method-name arg1:val)
     lexeme((
-        p_expr,
-        symbol(".@"),
-        symbol("("),
+        symbol("@("),
+        p_expr,       // target expression
+        p_identifier, // selector name
         separated(0.., parse_keyword_argument, symbol(" ")),
         symbol(")"),
     ))
-    .map(|(target, _, _, args, _)| Expr::SelectorCall(Box::new(target), args))
+    .map(|(_, target, selector, args, _)| Expr::SelectorCall {
+        target: Box::new(target),
+        selector,
+        args,
+    })
     .parse_next(input)
 }
 
 pub fn p_block<'s>(input: &mut &'s str) -> Result<Expr> {
-    // Block expression enclosed in curly braces, with statements separated by semicolons.
+    // Block expression enclosed in curly braces, with statements separated by semicolons or whitespace.
     // block
-    // ..
+    //  as
+    //  bs
     // end
 
     lexeme((
         symbol("block"),
-        separated(0.., p_expr, symbol(";")),
+        separated(0.., p_expr, alt((symbol(";"), multispace1))),
         symbol("end"),
     ))
     .map(|(_, statements, _)| Expr::Block(statements))
     .parse_next(input)
 }
 
+// Main expression parser
 pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     expression(p_application_expr)
         .infix(preceded(
-            ws,
+            skip_ws,
             dispatch! { any;
                 '+' => Infix::Left(10, |_, lhs, rhs| {
                     Ok(Expr::Binary {

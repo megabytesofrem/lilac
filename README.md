@@ -13,10 +13,54 @@ a-counter-var += 1 -- Increment a counter
 ### Functions
 ```
 def simple-sum (a: i32, b: i32) -> i32 = a + b
-def insert-to-list (l: List[i32], v: i32) = List.insert-item(l, v)
+
+-- Function calls are ML style
+def insert-item-if-not-existing[a] (l: List[a], v: a) =
+  if not List.contains-elem l v
+    then List.insert-elem l v
+    else List.get l v
+
 
 -- Generic function
-def id-of[a](a`: a) = a`
+def id-of[a](a': a) = a'
+```
+
+### Objective C style OOP
+Lilac encourages the usage of Objective C/Smalltalk style messaging between immutable objects
+
+```
+struct Window
+  private width: i32
+  private height: i32
+end
+
+struct App
+  private win: Window
+end
+
+protocol App'
+  message get-window (self: App) -> Window
+end
+
+implement App' on App
+  message get-window (self: App) = self.win
+end
+
+protocol Window'
+  message resize (self: Window, to-width: i32, height: i32) -> unit
+end
+
+implement Window' on Window
+  message resize (self: Window, to-width: i32, height: i32) = block
+    self.width = to-width
+    self.height = to-height
+  end
+end
+
+-- Use it like so
+def handle_app (self: App) -> unit = block
+  @(@(self get-window) resize to-width:640 height:480)
+end
 ```
 
 ### Control flow
