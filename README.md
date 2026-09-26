@@ -20,9 +20,6 @@ def insert-item-if-not-existing[a] (l: List[a], v: a) =
     then List.insert-elem l v
     else List.get l v
 
-def replace-array (arr: #[i32], with: #[i32]) =
-  Array.swap arr with
-
 -- Generic function
 def id-of[a](a': a) = a'
 ```
@@ -69,6 +66,14 @@ let curr-win: Win = [app get-window]
 let win': Win = [[curr-win resize to-width:640 and-height:480] titled text:"A window"]
 ```
 
+Lilac also provides a shorthand for protocols: extension methods.
+Extension methods are desugared to protocol implementations
+
+```
+def i32.squared (self) -> self = self * self
+def i32.cubed (self) -> self = self * self * self
+```
+
 ### Typeclasses
 Typeclasses _are_ protocols, and their methods are messages.
 
@@ -109,10 +114,5 @@ blocks to enable complex functions.
 do
   as
   bs
-end
-
--- Example of blocks
-def complex-function () -> unit = do
-  
 end
 ```
