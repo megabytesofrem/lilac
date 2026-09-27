@@ -45,6 +45,12 @@ protocol Object'
 end
 ```
 
+Data lives in one of two places: on the stack, on the heap. Lilac provides
+`*T` for raw pointers, and `@T` for pointers that are reference counted by a small ARC runtime.
+
+ARC is entirely opt-in and the backend emits `lilac_retain` and `lilac_release` to
+automatically manage memory.
+
 
 Message dispatch is routed using Lilacs equivalent to `objc_msgSend` - `lilac_msg_send`
 ```c

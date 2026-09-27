@@ -5,7 +5,7 @@ use crate::ast::types::Type;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Selector(pub String);
 
-/// Represents an Objective-C style message of the format:
+/// An Objective-C style message of the format:
 /// `[target selector-name arg1:val arg2:val2 ...]`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
@@ -15,7 +15,7 @@ pub struct Message {
     pub return_type: Option<Type>,
 }
 
-/// Represents a handler for an Objective-C style message, containing the message itself
+/// A handler for an Objective-C style message, containing the message itself
 /// and the body of the handler.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageHandler {
