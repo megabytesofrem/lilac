@@ -84,20 +84,25 @@ pub enum Expr {
         rhs: Box<Expr>,
     },
 
+    Unary {
+        op: UnaryOp,
+        expr: Box<Expr>,
+    },
+
     // Member access expression: object.member
     Member(Box<Expr>, String),
+
+    // ML style function application: f x y z
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+    },
 
     // Objective-C style selector call: [target selector-name arg1:val]
     SelectorCall {
         target: Box<Expr>,
         selector: String,
         args: Vec<(String, Expr)>,
-    },
-
-    // ML style function application: f x y z
-    Call {
-        callee: Box<Expr>,
-        arguments: Vec<Expr>,
     },
 
     // ML style let expression:

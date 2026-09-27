@@ -1,297 +1,14 @@
-use crate::ast;
-use std::fmt;
+//! Objective-C code generation backend for the Lilac compiler
+//!
+//! NOTE: This is the most complete backend currently, as the C and JS backend would require re-implementing
+//! objc_msgSend and retain/release functions.
 
+use crate::{ast, passes::objc_ast::*};
+
+/// Context for Objective-C code generation
 pub struct CodegenCtx {
     emitted_code: String,
     indentation_level: usize,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-#[rustfmt::skip]
-pub enum CType {
-    Id,         // id: generic Objective-C object
-    Int8,       // int8_t
-    Int16,      // int16_t
-    Int32,      // int32_t
-    Int64,      // int64_t
-    UInt8,      // uint8_t
-    UInt16,     // uint16_t
-    UInt32,     // uint32_t
-    UInt64,     // uint64_t
-    Float,      // float
-    Double,     // double
-    Bool,       // BOOL
-    Char,       // char
-    String,     // NSString *
-    Void,       // void
-
-    // Named type
-    Named(String),
-
-    // NS-prefixed types e.g NSString, NSNumber
-    NS(String),
-
-    Array(Box<CType>),
-    Pointer(Box<CType>),
-
-    // Objective-C block type: return_type (^)(parameter_types)
-    Block(Box<CType>, Vec<CType>),
-}
-
-impl fmt::Display for CType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CType::Id => write!(f, "id"),
-            CType::Int8 => write!(f, "int8_t"),
-            CType::Int16 => write!(f, "int16_t"),
-            CType::Int32 => write!(f, "int32_t"),
-            CType::Int64 => write!(f, "int64_t"),
-            CType::UInt8 => write!(f, "uint8_t"),
-            CType::UInt16 => write!(f, "uint16_t"),
-            CType::UInt32 => write!(f, "uint32_t"),
-            CType::UInt64 => write!(f, "uint64_t"),
-            CType::Float => write!(f, "float"),
-            CType::Double => write!(f, "double"),
-            CType::Bool => write!(f, "BOOL"),
-            CType::Char => write!(f, "char"),
-            CType::String => write!(f, "NSString *"),
-            CType::Void => write!(f, "void"),
-            CType::Named(name) => write!(f, "{}", name),
-            CType::NS(name) => write!(f, "{}", name),
-            CType::Array(inner) => write!(f, "{}[]", inner),
-            CType::Pointer(inner) => write!(f, "{} *", inner),
-            CType::Block(return_type, parameters) => {
-                let params: Vec<String> = parameters.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "{} (^)( {} )", return_type, params.join(", "))
-            }
-        }
-    }
-}
-
-// MARK: Objective C AST
-
-/// A tag for an Objective-C property attribute.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-#[rustfmt::skip]
-pub enum AttributeTag {
-    Nonatomic,      // @property (nonatomic)
-    Weak,           // @property (weak)
-    Strong,         // @property (strong)
-    Assign,         // @property (assign)
-    ReadOnly,       // @property (readonly)
-    ReadWrite,      // @property (readwrite)
-    Copy,           // @property (copy)
-    Getter,         // @property (getter)
-    Setter,         // @property (setter)
-}
-
-impl fmt::Display for AttributeTag {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AttributeTag::Nonatomic => write!(f, "nonatomic"),
-            AttributeTag::Weak => write!(f, "weak"),
-            AttributeTag::Strong => write!(f, "strong"),
-            AttributeTag::Assign => write!(f, "assign"),
-            AttributeTag::ReadOnly => write!(f, "readonly"),
-            AttributeTag::ReadWrite => write!(f, "readwrite"),
-            AttributeTag::Copy => write!(f, "copy"),
-            AttributeTag::Getter => write!(f, "getter"),
-            AttributeTag::Setter => write!(f, "setter"),
-        }
-    }
-}
-
-/// An Objective-C property
-///
-/// Contains the name of the property, its attribute tags, and its type.
-#[derive(Debug, Clone)]
-pub struct ObjCProperty {
-    name: String,
-    attribute_tags: Vec<AttributeTag>,
-    ctype: CType,
-}
-
-/// An Objective-C method
-///
-/// NOTE: If the method is static, it will be prefixed with a `+` rather than a `-`.
-#[derive(Debug, Clone)]
-pub struct ObjCMethod {
-    name: String,
-    parameters: Vec<(String, CType)>,
-    return_type: CType,
-    is_static_method: bool,
-    body: Vec<ObjCStmt>,
-}
-
-/// An Objective-C @interface
-///
-/// Contains the name of the interface, its subclass, properties, and methods.
-///
-/// ```objc
-/// // Person.h
-/// @interface Person : NSObject
-///
-/// @property (nonatomic, strong) NSString *name;
-///
-/// - (void)sayHello;
-///
-/// @end
-///
-/// // An interface can also conform to protocols
-/// @interface Person <Protocol1, Protocol2>
-///
-/// @end
-/// ```
-#[derive(Debug, Clone)]
-pub struct ObjCInterface {
-    name: String,
-    subclass: String,
-    conforms_to: Vec<String>,
-    category: Option<String>,
-
-    instance_variables: Vec<ObjCProperty>,
-    properties: Vec<ObjCProperty>,
-    methods: Vec<ObjCMethod>,
-}
-
-/// An Objective-C @protocol
-///
-/// Contains the name of the protocol and its methods.
-///
-/// ```objc
-/// @protocol Protocol
-///
-/// - (void)requiredMethod;
-///
-/// @optional
-/// - (void)optionalMethod;
-///
-/// @end
-/// ```
-#[derive(Debug, Clone)]
-pub struct ObjCProtocol {
-    name: String,
-    methods: Vec<ObjCMethod>,
-    optional_methods: Vec<ObjCMethod>,
-}
-
-/// An Objective-C @autoreleasepool
-///
-/// Contains the body of statements to be executed within the autorelease pool.
-///
-/// ```objc
-/// @autoreleasepool {
-///     // Your code here
-/// }
-/// ```
-#[derive(Debug, Clone)]
-pub struct ObjCAutoreleasePool {
-    body: Vec<ObjCStmt>,
-}
-
-/// An Objective-C @implementation
-///
-/// Contains the name of the implementation and its methods.
-///
-/// ```objc
-/// @implementation Person
-///
-/// - (void)sayHello {
-///     NSLog(@"Hello, world!");
-/// }
-///
-/// @end
-/// ```
-#[derive(Debug, Clone)]
-pub struct ObjCImplementation {
-    name: String,
-    methods: Vec<ObjCMethod>,
-}
-
-#[derive(Debug, Clone)]
-pub enum ObjCPrePostfixOp {
-    Inc, // ++
-    Dec, // --
-}
-
-#[derive(Debug, Clone)]
-pub enum ObjCExpr {
-    Literal(ast::Literal),
-    Ident(String),
-
-    Binary {
-        op: ast::BinaryOp,
-        left: Box<ObjCExpr>,
-        right: Box<ObjCExpr>,
-    },
-
-    Unary {
-        op: ast::UnaryOp,
-        expr: Box<ObjCExpr>,
-    },
-
-    Prefix {
-        op: ObjCPrePostfixOp,
-        expr: Box<ObjCExpr>,
-    },
-
-    Postfix {
-        op: ObjCPrePostfixOp,
-        expr: Box<ObjCExpr>,
-    },
-
-    // C function call: NSLog(@"message")
-    CCall {
-        callee: Box<ObjCExpr>,
-        arguments: Vec<ObjCExpr>,
-    },
-
-    // Objective-C style selector call: [target selectorName arg1:val]
-    SelectorCall {
-        target: Box<ObjCExpr>,
-        selector: String,
-        args: Vec<(String, ObjCExpr)>,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum ObjCStmt {
-    Expr(ObjCExpr),
-
-    VarDecl {
-        name: String,
-        var_type: CType,
-        initial_value: Option<ObjCExpr>,
-    },
-
-    Assign {
-        target: Box<ObjCExpr>,
-        value: Box<ObjCExpr>,
-    },
-
-    Return {
-        value: Option<ObjCExpr>,
-    },
-
-    For {
-        init: Box<ObjCExpr>,
-        condition: Box<ObjCExpr>,
-        increment: Box<ObjCExpr>,
-        body: Vec<ObjCStmt>,
-    },
-
-    ForIn {
-        var: String,
-        iterable: Box<ObjCExpr>,
-        body: Vec<ObjCStmt>,
-    },
-
-    While {
-        condition: Box<ObjCExpr>,
-        body: Vec<ObjCStmt>,
-    },
 }
 
 // MARK: Objective-C code emission
@@ -312,18 +29,28 @@ impl CodegenCtx {
     }
 
     fn format_method_signature(&self, method: &ObjCMethod) -> String {
-        let prefix = if method.is_static_method { "+" } else { "-" };
+        let prefix = if method.prototype.is_static_method {
+            "+"
+        } else {
+            "-"
+        };
 
         // Handle zero-parameter methods: e.g., - (void)sayHello;
-        if method.parameters.is_empty() {
-            return format!("{} ({}){};", prefix, method.return_type, method.name);
+        if method.prototype.parameters.is_empty() {
+            return format!(
+                "{} ({}){};",
+                prefix, method.prototype.return_type, method.prototype.name
+            );
         }
 
-        let mut sig = format!("{} ({}){}", prefix, method.return_type, method.name);
+        let mut sig = format!(
+            "{} ({}){}",
+            prefix, method.prototype.return_type, method.prototype.name
+        );
 
         // Format multi-keyword Objective-C parameters:
         // [name]:(type)paramName keyword2:(type)paramName2
-        for (i, (keyword_or_name, ctype)) in method.parameters.iter().enumerate() {
+        for (i, (keyword_or_name, ctype)) in method.prototype.parameters.iter().enumerate() {
             if i == 0 {
                 // The first parameter's colon attaches directly to the primary selector name
                 sig.push_str(&format!(":({}){}", ctype, keyword_or_name));
@@ -340,7 +67,20 @@ impl CodegenCtx {
         sig
     }
 
-    pub fn emit_property(&mut self, property: ObjCProperty) -> String {
+    fn emit_indent(&mut self) {
+        self.emitted_code
+            .push_str(&"    ".repeat(self.indentation_level));
+    }
+
+    fn emit_body(&mut self, body: Vec<ObjCStmt>) {
+        self.indentation_level += 1;
+        for stmt in body {
+            self.emit_stmt(stmt);
+        }
+        self.indentation_level -= 1;
+    }
+
+    pub fn emit_property(&mut self, property: ObjCPropertyField) -> String {
         let attribute = property
             .attribute_tags
             .iter()
@@ -399,7 +139,7 @@ impl CodegenCtx {
         // Handle optional category extensions: @interface Person (MyCategory)
         if let Some(category) = &interface.category {
             self.emitted_code.push_str(&format!(
-                "@interface {}({}){}\n",
+                "@interface {} ({}){}\n",
                 interface.name, category, conforms_str
             ));
         } else {
@@ -461,13 +201,15 @@ impl CodegenCtx {
 
     fn emit_inner_expr(&self, expr: ObjCExpr) -> String {
         match expr {
-            ObjCExpr::Literal(lit) => self.emit_literal(lit),
+            ObjCExpr::Sentinel => String::new(),
+
+            ObjCExpr::Lit(lit) => self.emit_literal(lit),
             ObjCExpr::Ident(name) => name,
-            ObjCExpr::Binary { op, left, right } => format!(
+            ObjCExpr::Binary { op, lhs, rhs } => format!(
                 "({} {} {})",
-                self.emit_inner_expr(*left),
+                self.emit_inner_expr(*lhs),
                 op,
-                self.emit_inner_expr(*right)
+                self.emit_inner_expr(*rhs)
             ),
             ObjCExpr::Unary { op, expr } => {
                 format!("({}{})", op, self.emit_inner_expr(*expr))
@@ -512,19 +254,6 @@ impl CodegenCtx {
 
     pub fn emit_expr(&mut self, expr: ObjCExpr) {
         self.emitted_code.push_str(&self.emit_inner_expr(expr));
-    }
-
-    fn emit_indent(&mut self) {
-        self.emitted_code
-            .push_str(&"    ".repeat(self.indentation_level));
-    }
-
-    fn emit_body(&mut self, body: Vec<ObjCStmt>) {
-        self.indentation_level += 1;
-        for stmt in body {
-            self.emit_stmt(stmt);
-        }
-        self.indentation_level -= 1;
     }
 
     pub fn emit_stmt(&mut self, stmt: ObjCStmt) {
@@ -626,15 +355,20 @@ impl CodegenCtx {
 
     pub fn emit_method_body(&mut self, method: ObjCMethod) {
         self.emit_indent();
-        if method.is_static_method {
-            self.emitted_code
-                .push_str(&format!("+ ({}){}", method.return_type, method.name));
+        if method.prototype.is_static_method {
+            self.emitted_code.push_str(&format!(
+                "+ ({}){}",
+                method.prototype.return_type, method.prototype.name
+            ));
         } else {
-            self.emitted_code
-                .push_str(&format!("- ({}){}", method.return_type, method.name));
+            self.emitted_code.push_str(&format!(
+                "- ({}){}",
+                method.prototype.return_type, method.prototype.name
+            ));
         }
-        if !method.parameters.is_empty() {
+        if !method.prototype.parameters.is_empty() {
             let params: Vec<String> = method
+                .prototype
                 .parameters
                 .into_iter()
                 .map(|p| format!("{}:({})", p.0, p.1))
@@ -656,7 +390,7 @@ mod tests {
     fn emits_property() {
         let mut codegen = CodegenCtx::new();
 
-        let property = ObjCProperty {
+        let property = ObjCPropertyField {
             name: "name".to_string(),
             ctype: CType::String,
             attribute_tags: vec![AttributeTag::Nonatomic, AttributeTag::Strong],
@@ -673,17 +407,21 @@ mod tests {
 
         let methods = vec![
             ObjCMethod {
-                name: "calculateArea".to_string(),
-                parameters: vec![],
-                return_type: CType::Float,
-                is_static_method: false,
+                prototype: ObjCPrototype {
+                    name: "calculateArea".to_string(),
+                    parameters: vec![],
+                    return_type: CType::Float,
+                    is_static_method: false,
+                },
                 body: vec![],
             },
             ObjCMethod {
-                name: "calculatePerimeter".to_string(),
-                parameters: vec![],
-                return_type: CType::Float,
-                is_static_method: false,
+                prototype: ObjCPrototype {
+                    name: "calculatePerimeter".to_string(),
+                    parameters: vec![],
+                    return_type: CType::Float,
+                    is_static_method: false,
+                },
                 body: vec![],
             },
         ];
@@ -707,12 +445,12 @@ mod tests {
         let mut codegen = CodegenCtx::new();
 
         let properties = vec![
-            ObjCProperty {
+            ObjCPropertyField {
                 name: "width".to_string(),
                 ctype: CType::Float,
                 attribute_tags: vec![AttributeTag::Nonatomic, AttributeTag::Assign],
             },
-            ObjCProperty {
+            ObjCPropertyField {
                 name: "height".to_string(),
                 ctype: CType::Float,
                 attribute_tags: vec![AttributeTag::Nonatomic, AttributeTag::Assign],
@@ -741,15 +479,17 @@ mod tests {
     fn emits_method_body() {
         let mut codegen = CodegenCtx::new();
         let method = ObjCMethod {
-            name: "calculateArea".to_string(),
-            parameters: vec![],
-            return_type: CType::Float,
-            is_static_method: false,
+            prototype: ObjCPrototype {
+                name: "calculateArea".to_string(),
+                parameters: vec![],
+                return_type: CType::Float,
+                is_static_method: false,
+            },
             body: vec![ObjCStmt::Return {
                 value: Some(ObjCExpr::Binary {
                     op: ast::BinaryOp::Mul,
-                    left: Box::new(ObjCExpr::Ident("width".into())),
-                    right: Box::new(ObjCExpr::Ident("height".into())),
+                    lhs: Box::new(ObjCExpr::Ident("width".into())),
+                    rhs: Box::new(ObjCExpr::Ident("height".into())),
                 }),
             }],
         };
@@ -767,15 +507,17 @@ mod tests {
     fn emits_implementation() {
         let mut codegen = CodegenCtx::new();
         let method = ObjCMethod {
-            name: "calculateArea".to_string(),
-            parameters: vec![],
-            return_type: CType::Float,
-            is_static_method: false,
+            prototype: ObjCPrototype {
+                name: "calculateArea".to_string(),
+                parameters: vec![],
+                return_type: CType::Float,
+                is_static_method: false,
+            },
             body: vec![ObjCStmt::Return {
                 value: Some(ObjCExpr::Binary {
                     op: ast::BinaryOp::Mul,
-                    left: Box::new(ObjCExpr::Ident("width".into())),
-                    right: Box::new(ObjCExpr::Ident("height".into())),
+                    lhs: Box::new(ObjCExpr::Ident("width".into())),
+                    rhs: Box::new(ObjCExpr::Ident("height".into())),
                 }),
             }],
         };
@@ -798,11 +540,11 @@ mod tests {
         let mut codegen = CodegenCtx::new();
         codegen.emit_expr(ObjCExpr::Binary {
             op: ast::BinaryOp::Add,
-            left: Box::new(ObjCExpr::Literal(ast::Literal::Int(1))),
-            right: Box::new(ObjCExpr::Binary {
+            lhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(1))),
+            rhs: Box::new(ObjCExpr::Binary {
                 op: ast::BinaryOp::Mul,
-                left: Box::new(ObjCExpr::Literal(ast::Literal::Int(2))),
-                right: Box::new(ObjCExpr::Literal(ast::Literal::Int(3))),
+                lhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(2))),
+                rhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(3))),
             }),
         });
         assert_eq!(codegen.emitted_code, "(1 + (2 * 3))");
@@ -814,8 +556,8 @@ mod tests {
         codegen.emit_expr(ObjCExpr::CCall {
             callee: Box::new(ObjCExpr::Ident("max".into())),
             arguments: vec![
-                ObjCExpr::Literal(ast::Literal::Int(1)),
-                ObjCExpr::Literal(ast::Literal::Int(2)),
+                ObjCExpr::Lit(ast::Literal::Int(1)),
+                ObjCExpr::Lit(ast::Literal::Int(2)),
             ],
         });
         assert_eq!(codegen.emitted_code, "max(1, 2)");
@@ -824,7 +566,7 @@ mod tests {
         codegen.emit_expr(ObjCExpr::SelectorCall {
             target: Box::new(ObjCExpr::Ident("window".into())),
             selector: "resize".into(),
-            args: vec![("width".into(), ObjCExpr::Literal(ast::Literal::Int(640)))],
+            args: vec![("width".into(), ObjCExpr::Lit(ast::Literal::Int(640)))],
         });
         assert_eq!(codegen.emitted_code, "[window resize width:640]");
     }
