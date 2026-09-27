@@ -47,7 +47,7 @@ pub enum Expr {
     // Member access expression: object.member
     Member(Box<Expr>, String),
 
-    // Objective-C style selector call: @(target selector-name arg1:val)
+    // Objective-C style selector call: [target selector-name arg1:val]
     SelectorCall {
         target: Box<Expr>,
         selector: String,

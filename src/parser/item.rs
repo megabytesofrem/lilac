@@ -1,7 +1,7 @@
 use winnow::Parser;
 use winnow::Result;
 use winnow::combinator::alt;
-use winnow::combinator::{opt, preceded, repeat, separated};
+use winnow::combinator::{opt, preceded, repeat, terminated};
 
 use crate::ast::Item;
 use crate::ast::message;
@@ -38,7 +38,7 @@ pub fn p_struct_def<'s>(input: &mut &'s str) -> Result<Item> {
     lexeme((
         keyword("struct"),
         p_identifier,
-        separated(0.., struct_field, symbol(",")),
+        repeat(0.., terminated(struct_field, opt(symbol(",")))),
         keyword("end"),
     ))
     .map(|(_, name, fields, _)| Item::StructDef { name, fields })
@@ -56,7 +56,7 @@ pub fn p_enum_def<'s>(input: &mut &'s str) -> Result<Item> {
     lexeme((
         keyword("enum"),
         p_identifier,
-        separated(0.., enum_variant, symbol(",")),
+        repeat(0.., terminated(enum_variant, opt(symbol(",")))),
         keyword("end"),
     ))
     .map(|(_, name, variants, _)| Item::EnumDef { name, variants })
@@ -163,9 +163,49 @@ pub fn p_item<'s>(input: &mut &'s str) -> Result<Item> {
     // Item can be an enum, protocol, or protocol implementation
 
     alt((
+        p_struct_def,       // Struct definition
         p_enum_def,         // Enum definition
         p_protocol_def,     // Protocol definition
         p_implementation,   // Protocol implementation
     ))
     .parse_next(input)
+}
+
+mod tests {
+    #[test]
+    fn struct_def() {
+        let mut input = "struct MyStruct
+            field1: i32
+        end";
+        let result = super::p_item(&mut input);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn enum_def() {
+        let mut input = "enum MyEnum
+            Variant1
+            Variant2
+        end";
+        let result = super::p_item(&mut input);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn protocol_def() {
+        let mut input = "protocol MyProtocol
+            message mySelector (arg1: i32) -> bool
+        end";
+        let result = super::p_item(&mut input);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn protocol_implementation() {
+        let mut input = "implement MyProtocol on MyStruct
+            message mySelector (arg1: i32) = myHandlerBody
+        end";
+        let result = super::p_item(&mut input);
+        assert!(result.is_ok());
+    }
 }

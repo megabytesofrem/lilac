@@ -6,7 +6,7 @@ use winnow::{
     ascii::multispace1,
     combinator::{
         Infix, Postfix, alt, delimited, dispatch, expression, fail, opt, preceded, repeat,
-        separated,
+        separated, terminated,
     },
 };
 
@@ -247,6 +247,7 @@ fn p_application_primary<'s>(input: &mut &'s str) -> Result<Expr> {
         p_let_expr,
         p_for_expr,
         p_until_expr,
+        p_selector_call,
         p_literal.map(Expr::Lit),
         p_identifier.map(Expr::Ident),
         p_array_expr,
@@ -290,8 +291,8 @@ pub fn p_selector_call<'s>(input: &mut &'s str) -> Result<Expr> {
     // Objective-C style selector call: [target selector-name arg1:val1 arg2:val2 ...]
     lexeme((
         symbol("["),
-        p_expr,       // target expression
-        p_identifier, // selector name
+        p_application_primary, // target expression
+        p_identifier,          // selector name
         separated(0.., parse_keyword_argument, symbol(" ")),
         symbol("]"),
     ))
@@ -324,94 +325,97 @@ pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     expression(p_application_expr)
         .infix(preceded(
             skip_ws,
-            dispatch! { any;
-                '+' => Infix::Left(10, |_, lhs, rhs| {
-                    Ok(Expr::Binary {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    })
-                }),
-                '-' => Infix::Left(10, |_, lhs, rhs| {
-                    Ok(Expr::Binary {
-                        op: BinaryOp::Sub,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    })
-                }),
-                '*' => Infix::Left(20, |_, lhs, rhs| {
-                    Ok(Expr::Binary {
-                        op: BinaryOp::Mul,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    })
-                }),
-                '/' => Infix::Left(20, |_, lhs, rhs| {
-                    Ok(Expr::Binary {
-                        op: BinaryOp::Div,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    })
-                }),
-                '=' => alt((
-                    '='.value(Infix::Left(5, |_, lhs, rhs| {
+            terminated(
+                dispatch! { any;
+                    '+' => Infix::Left(10, |_, lhs, rhs| {
                         Ok(Expr::Binary {
-                            op: BinaryOp::Eq,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    })),
-                    Infix::Right(1, |_, target, value| {
-                        Ok(Expr::Assign {
-                            target: Box::new(target),
-                            value: Box::new(value),
-                        })
-                    }),
-                )),
-                '!' => dispatch! { any;
-                    '=' => Infix::Left(5, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Ne,
+                            op: BinaryOp::Add,
                             lhs: Box::new(lhs),
                             rhs: Box::new(rhs),
                         })
                     }),
+                    '-' => Infix::Left(10, |_, lhs, rhs| {
+                        Ok(Expr::Binary {
+                            op: BinaryOp::Sub,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        })
+                    }),
+                    '*' => Infix::Left(20, |_, lhs, rhs| {
+                        Ok(Expr::Binary {
+                            op: BinaryOp::Mul,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        })
+                    }),
+                    '/' => Infix::Left(20, |_, lhs, rhs| {
+                        Ok(Expr::Binary {
+                            op: BinaryOp::Div,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        })
+                    }),
+                    '=' => alt((
+                        '='.value(Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Eq,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        })),
+                        Infix::Right(1, |_, target, value| {
+                            Ok(Expr::Assign {
+                                target: Box::new(target),
+                                value: Box::new(value),
+                            })
+                        }),
+                    )),
+                    '!' => dispatch! { any;
+                        '=' => Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Ne,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        }),
+                        _ => fail,
+                    },
+                    '<' => dispatch! { any;
+                        '=' => Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Le,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        }),
+                        _ => Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Lt,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        }),
+                    },
+                    '>' => dispatch! { any;
+                        '=' => Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Ge,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        }),
+                        _ => Infix::Left(5, |_, lhs, rhs| {
+                            Ok(Expr::Binary {
+                                op: BinaryOp::Gt,
+                                lhs: Box::new(lhs),
+                                rhs: Box::new(rhs),
+                            })
+                        }),
+                    },
                     _ => fail,
                 },
-                '<' => dispatch! { any;
-                    '=' => Infix::Left(5, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Le,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    _ => Infix::Left(5, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Lt,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                },
-                '>' => dispatch! { any;
-                    '=' => Infix::Left(5, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Ge,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    _ => Infix::Left(5, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Gt,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                },
-                _ => fail,
-            },
+                skip_ws,
+            ),
         ))
         .postfix(preceded(
             (skip_ws, keyword("with")),
@@ -435,4 +439,139 @@ pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
             }),
         ))
         .parse_next(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &str) -> Expr {
+        let mut input = input;
+        let expr = p_expr(&mut input).expect("expression should parse");
+        assert!(input.is_empty(), "unparsed input: {input:?}");
+        expr
+    }
+
+    fn ident(name: &str) -> Expr {
+        Expr::Ident(name.to_string())
+    }
+
+    fn int(value: i64) -> Expr {
+        Expr::Lit(Literal::Int(value))
+    }
+
+    fn call(callee: Expr, argument: Expr) -> Expr {
+        Expr::Call {
+            callee: Box::new(callee),
+            arguments: vec![argument],
+        }
+    }
+
+    fn selector_call(target: Expr, selector: &str, args: Vec<(&str, Expr)>) -> Expr {
+        Expr::SelectorCall {
+            target: Box::new(target),
+            selector: selector.to_string(),
+            args: args
+                .into_iter()
+                .map(|(name, value)| (name.to_string(), value))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn literals_parse() {
+        assert_eq!(parse("42"), int(42));
+        assert_eq!(parse("1.5"), Expr::Lit(Literal::Float(1.5)));
+        assert_eq!(parse("\"hello\""), Expr::Lit(Literal::Str("hello".into())));
+        assert_eq!(parse("''a''"), Expr::Lit(Literal::Char('a')));
+        assert_eq!(parse("true"), Expr::Lit(Literal::Bool(true)));
+    }
+
+    #[test]
+    fn identifiers_parse() {
+        assert_eq!(parse("kebab-case"), ident("kebab-case"));
+        assert_eq!(parse("snake_case"), ident("snake_case"));
+        assert_eq!(parse("camelCase"), ident("camelCase"));
+        assert_eq!(parse("trailing'"), ident("trailing'"));
+    }
+
+    #[test]
+    fn application_is_left_associative() {
+        assert_eq!(
+            parse("f x y"),
+            call(call(ident("f"), ident("x")), ident("y"))
+        );
+        assert_eq!(parse("this-as-ident"), ident("this-as-ident"));
+    }
+
+    #[test]
+    fn selector_call_parse() {
+        assert_eq!(
+            parse("[obj do-something arg1:val1]"),
+            selector_call(ident("obj"), "do-something", vec![("arg1", ident("val1"))])
+        );
+    }
+
+    #[test]
+    fn arithmetic_respects_precedence() {
+        assert_eq!(
+            parse("1 + 2 * 3"),
+            Expr::Binary {
+                op: BinaryOp::Add,
+                lhs: Box::new(int(1)),
+                rhs: Box::new(Expr::Binary {
+                    op: BinaryOp::Mul,
+                    lhs: Box::new(int(2)),
+                    rhs: Box::new(int(3)),
+                }),
+            }
+        );
+        assert_eq!(
+            parse("x - 1"),
+            Expr::Binary {
+                op: BinaryOp::Sub,
+                lhs: Box::new(ident("x")),
+                rhs: Box::new(int(1)),
+            }
+        );
+    }
+
+    #[test]
+    fn comparisons_and_assignment_parse() {
+        assert!(matches!(
+            parse("x == 1"),
+            Expr::Binary {
+                op: BinaryOp::Eq,
+                ..
+            }
+        ));
+        assert!(matches!(
+            parse("x != 1"),
+            Expr::Binary {
+                op: BinaryOp::Ne,
+                ..
+            }
+        ));
+        assert!(matches!(parse("x = 1"), Expr::Assign { .. }));
+    }
+
+    #[test]
+    fn let_for_until_parse() {
+        assert!(matches!(parse("let x = f y in x"), Expr::Let { name, .. } if name == "x"));
+        assert!(matches!(parse("for i in xs do i"), Expr::For { iterator, .. } if iterator == "i"));
+        assert!(matches!(parse("until done do step"), Expr::Until { .. }));
+    }
+
+    #[test]
+    fn with_parse() {
+        assert!(
+            matches!(parse("window with { title: text }"), Expr::With { new_props, .. } if new_props.len() == 1)
+        );
+    }
+
+    #[test]
+    fn reserved_words_are_not_identifiers() {
+        let mut input = "let for in do";
+        assert!(p_identifier(&mut input).is_err());
+    }
 }
