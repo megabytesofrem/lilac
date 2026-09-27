@@ -3,21 +3,28 @@ use std::fmt;
 
 pub struct CodegenCtx {
     emitted_code: String,
+    indentation_level: usize,
 }
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+#[rustfmt::skip]
 pub enum CType {
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    Float,
-    Double,
-    Bool,
-    Char,
-    String,
-    Void,
+    Id,         // id: generic Objective-C object
+    Int8,       // int8_t
+    Int16,      // int16_t
+    Int32,      // int32_t
+    Int64,      // int64_t
+    UInt8,      // uint8_t
+    UInt16,     // uint16_t
+    UInt32,     // uint32_t
+    UInt64,     // uint64_t
+    Float,      // float
+    Double,     // double
+    Bool,       // BOOL
+    Char,       // char
+    String,     // NSString *
+    Void,       // void
 
     // Named type
     Named(String),
@@ -27,15 +34,23 @@ pub enum CType {
 
     Array(Box<CType>),
     Pointer(Box<CType>),
+
+    // Objective-C block type: return_type (^)(parameter_types)
+    Block(Box<CType>, Vec<CType>),
 }
 
 impl fmt::Display for CType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CType::Id => write!(f, "id"),
             CType::Int8 => write!(f, "int8_t"),
             CType::Int16 => write!(f, "int16_t"),
             CType::Int32 => write!(f, "int32_t"),
             CType::Int64 => write!(f, "int64_t"),
+            CType::UInt8 => write!(f, "uint8_t"),
+            CType::UInt16 => write!(f, "uint16_t"),
+            CType::UInt32 => write!(f, "uint32_t"),
+            CType::UInt64 => write!(f, "uint64_t"),
             CType::Float => write!(f, "float"),
             CType::Double => write!(f, "double"),
             CType::Bool => write!(f, "BOOL"),
@@ -46,6 +61,10 @@ impl fmt::Display for CType {
             CType::NS(name) => write!(f, "{}", name),
             CType::Array(inner) => write!(f, "{}[]", inner),
             CType::Pointer(inner) => write!(f, "{} *", inner),
+            CType::Block(return_type, parameters) => {
+                let params: Vec<String> = parameters.iter().map(|p| format!("{}", p)).collect();
+                write!(f, "{} (^)( {} )", return_type, params.join(", "))
+            }
         }
     }
 }
@@ -54,6 +73,7 @@ impl fmt::Display for CType {
 
 /// A tag for an Objective-C property attribute.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 #[rustfmt::skip]
 pub enum AttributeTag {
     Nonatomic,      // @property (nonatomic)
@@ -102,6 +122,7 @@ pub struct ObjCMethod {
     parameters: Vec<(String, CType)>,
     return_type: CType,
     is_static_method: bool,
+    body: Vec<ObjCStmt>,
 }
 
 /// An Objective-C @interface
@@ -251,13 +272,13 @@ pub enum ObjCStmt {
     },
 
     Return {
-        value: Box<ObjCExpr>,
+        value: Option<ObjCExpr>,
     },
 
     For {
-        init: Box<ObjCStmt>,
+        init: Box<ObjCExpr>,
         condition: Box<ObjCExpr>,
-        increment: Box<ObjCStmt>,
+        increment: Box<ObjCExpr>,
         body: Vec<ObjCStmt>,
     },
 
@@ -279,6 +300,7 @@ impl CodegenCtx {
     pub fn new() -> Self {
         Self {
             emitted_code: String::new(),
+            indentation_level: 0,
         }
     }
 
@@ -417,10 +439,8 @@ impl CodegenCtx {
             .push_str(&format!("@implementation {}\n", implementation.name));
 
         // Methods
-        for _method in implementation.methods {
-            // Here you would recursively emit each method
-            // For simplicity, we'll just use a placeholder
-            self.emitted_code.push_str("    // Method\n");
+        for method in implementation.methods {
+            self.emit_method_body(method);
         }
         self.emitted_code.push_str("@end\n");
     }
@@ -493,6 +513,139 @@ impl CodegenCtx {
     pub fn emit_expr(&mut self, expr: ObjCExpr) {
         self.emitted_code.push_str(&self.emit_inner_expr(expr));
     }
+
+    fn emit_indent(&mut self) {
+        self.emitted_code
+            .push_str(&"    ".repeat(self.indentation_level));
+    }
+
+    fn emit_body(&mut self, body: Vec<ObjCStmt>) {
+        self.indentation_level += 1;
+        for stmt in body {
+            self.emit_stmt(stmt);
+        }
+        self.indentation_level -= 1;
+    }
+
+    pub fn emit_stmt(&mut self, stmt: ObjCStmt) {
+        match stmt {
+            ObjCStmt::Expr(expr) => {
+                self.emit_indent();
+                self.emit_expr(expr);
+                self.emitted_code.push_str(";\n");
+            }
+
+            ObjCStmt::VarDecl {
+                name,
+                var_type,
+                initial_value,
+            } => {
+                self.emit_indent();
+                if let Some(initial_value) = initial_value {
+                    self.emitted_code.push_str(&format!(
+                        "{} {} = {};\n",
+                        self.emit_inner_expr(ObjCExpr::Ident(var_type.to_string())),
+                        name,
+                        self.emit_inner_expr(initial_value)
+                    ));
+                } else {
+                    self.emitted_code.push_str(&format!(
+                        "{} {};\n",
+                        self.emit_inner_expr(ObjCExpr::Ident(var_type.to_string())),
+                        name,
+                    ));
+                }
+            }
+
+            ObjCStmt::Assign { target, value } => {
+                self.emit_indent();
+                self.emitted_code.push_str(&format!(
+                    "{} = {};\n",
+                    self.emit_inner_expr(*target),
+                    self.emit_inner_expr(*value)
+                ));
+            }
+
+            ObjCStmt::Return { value } => {
+                self.emit_indent();
+
+                if let Some(value) = value {
+                    self.emitted_code
+                        .push_str(&format!("return {};\n", self.emit_inner_expr(value)));
+                } else {
+                    self.emitted_code.push_str("return;\n");
+                }
+            }
+
+            ObjCStmt::For {
+                init,
+                condition,
+                increment,
+                body,
+            } => {
+                self.emit_indent();
+                self.emitted_code.push_str(&format!(
+                    "for ({}; {}; {}) {{\n",
+                    self.emit_inner_expr(*init),
+                    self.emit_inner_expr(*condition),
+                    self.emit_inner_expr(*increment)
+                ));
+                self.emit_body(body);
+                self.emit_indent();
+                self.emitted_code.push_str("}\n");
+            }
+
+            ObjCStmt::ForIn {
+                var,
+                iterable,
+                body,
+            } => {
+                self.emit_indent();
+                self.emitted_code.push_str(&format!(
+                    "for (id {} in {}) {{\n",
+                    var,
+                    self.emit_inner_expr(*iterable)
+                ));
+                self.emit_body(body);
+                self.emit_indent();
+                self.emitted_code.push_str("}\n");
+            }
+
+            ObjCStmt::While { condition, body } => {
+                self.emit_indent();
+                self.emitted_code.push_str(&format!(
+                    "while ({}) {{\n",
+                    self.emit_inner_expr(*condition)
+                ));
+                self.emit_body(body);
+                self.emit_indent();
+                self.emitted_code.push_str("}\n");
+            }
+        }
+    }
+
+    pub fn emit_method_body(&mut self, method: ObjCMethod) {
+        self.emit_indent();
+        if method.is_static_method {
+            self.emitted_code
+                .push_str(&format!("+ ({}){}", method.return_type, method.name));
+        } else {
+            self.emitted_code
+                .push_str(&format!("- ({}){}", method.return_type, method.name));
+        }
+        if !method.parameters.is_empty() {
+            let params: Vec<String> = method
+                .parameters
+                .into_iter()
+                .map(|p| format!("{}:({})", p.0, p.1))
+                .collect();
+            self.emitted_code.push_str(&params.join(" "));
+        }
+        self.emitted_code.push_str(" {\n");
+        self.emit_body(method.body);
+        self.emit_indent();
+        self.emitted_code.push_str("}\n");
+    }
 }
 
 #[cfg(test)]
@@ -510,7 +663,6 @@ mod tests {
         };
 
         let emitted = codegen.emit_property(property);
-        println!("\n\n{}\n\n", emitted);
 
         assert!(emitted.contains("@property (nonatomic, strong) NSString * name;"));
     }
@@ -525,12 +677,14 @@ mod tests {
                 parameters: vec![],
                 return_type: CType::Float,
                 is_static_method: false,
+                body: vec![],
             },
             ObjCMethod {
                 name: "calculatePerimeter".to_string(),
                 parameters: vec![],
                 return_type: CType::Float,
                 is_static_method: false,
+                body: vec![],
             },
         ];
 
@@ -542,7 +696,7 @@ mod tests {
         codegen.emit_protocol(protocol);
         let emitted = codegen.emitted_code;
 
-        println!("\n\n{}\n\n", emitted);
+        println!("\n\nEmitted protocol:\n\n{}\n\n", emitted);
 
         assert!(emitted.contains("@protocol Shape"));
         assert!(emitted.contains("@end"));
@@ -551,16 +705,6 @@ mod tests {
     #[test]
     fn emits_interface() {
         let mut codegen = CodegenCtx::new();
-
-        // let methods = vec![ObjCMethod {
-        //     name: "sum".to_string(),
-        //     parameters: vec![
-        //         ("firstNumber".to_string(), CType::Int32),
-        //         ("secondNumber".to_string(), CType::Int32),
-        //     ],
-        //     return_type: CType::Int32,
-        //     is_static_method: false,
-        // }];
 
         let properties = vec![
             ObjCProperty {
@@ -587,9 +731,65 @@ mod tests {
         codegen.emit_interface(interface);
         let emitted = codegen.emitted_code;
 
-        println!("\n\n{}\n\n", emitted);
+        println!("\n\nEmitted interface:\n\n{}\n\n", emitted);
 
         assert!(emitted.contains("@interface Rectangle"));
+        assert!(emitted.contains("@end"));
+    }
+
+    #[test]
+    fn emits_method_body() {
+        let mut codegen = CodegenCtx::new();
+        let method = ObjCMethod {
+            name: "calculateArea".to_string(),
+            parameters: vec![],
+            return_type: CType::Float,
+            is_static_method: false,
+            body: vec![ObjCStmt::Return {
+                value: Some(ObjCExpr::Binary {
+                    op: ast::BinaryOp::Mul,
+                    left: Box::new(ObjCExpr::Ident("width".into())),
+                    right: Box::new(ObjCExpr::Ident("height".into())),
+                }),
+            }],
+        };
+        codegen.emit_method_body(method);
+        let emitted = codegen.emitted_code;
+
+        println!("\n\nEmitted method body:\n\n{}\n\n", emitted);
+
+        assert!(emitted.contains("- (float)calculateArea"));
+        assert!(emitted.contains("{"));
+        assert!(emitted.contains("}"));
+    }
+
+    #[test]
+    fn emits_implementation() {
+        let mut codegen = CodegenCtx::new();
+        let method = ObjCMethod {
+            name: "calculateArea".to_string(),
+            parameters: vec![],
+            return_type: CType::Float,
+            is_static_method: false,
+            body: vec![ObjCStmt::Return {
+                value: Some(ObjCExpr::Binary {
+                    op: ast::BinaryOp::Mul,
+                    left: Box::new(ObjCExpr::Ident("width".into())),
+                    right: Box::new(ObjCExpr::Ident("height".into())),
+                }),
+            }],
+        };
+
+        let implementation = ObjCImplementation {
+            name: "Rectangle".to_string(),
+            methods: vec![method],
+        };
+        codegen.emit_implementation(implementation);
+        let emitted = codegen.emitted_code;
+
+        println!("\n\nEmitted implementation:\n\n{}\n\n", emitted);
+
+        assert!(emitted.contains("@implementation Rectangle"));
         assert!(emitted.contains("@end"));
     }
 
@@ -642,5 +842,47 @@ mod tests {
             expr: Box::new(ObjCExpr::Ident("counter".into())),
         });
         assert_eq!(codegen.emitted_code, "++counter counter--");
+    }
+
+    #[test]
+    fn emits_loops_with_stateful_indentation() {
+        let mut codegen = CodegenCtx::new();
+        codegen.emit_stmt(ObjCStmt::ForIn {
+            var: "item".into(),
+            iterable: Box::new(ObjCExpr::Ident("items".into())),
+            body: vec![ObjCStmt::While {
+                condition: Box::new(ObjCExpr::Ident("running".into())),
+                body: vec![ObjCStmt::Return {
+                    value: Some(ObjCExpr::Ident("item".into())),
+                }],
+            }],
+        });
+
+        assert_eq!(
+            codegen.emitted_code,
+            "for (id item in items) {\n    while (running) {\n        return item;\n    }\n}\n"
+        );
+    }
+
+    #[test]
+    fn emits_c_style_for_loop() {
+        let mut codegen = CodegenCtx::new();
+        codegen.emit_stmt(ObjCStmt::For {
+            init: Box::new(ObjCExpr::Ident("i = 0".into())),
+            condition: Box::new(ObjCExpr::Ident("i < 3".into())),
+            increment: Box::new(ObjCExpr::Postfix {
+                op: ObjCPrePostfixOp::Inc,
+                expr: Box::new(ObjCExpr::Ident("i".into())),
+            }),
+            body: vec![ObjCStmt::Expr(ObjCExpr::CCall {
+                callee: Box::new(ObjCExpr::Ident("work".into())),
+                arguments: vec![],
+            })],
+        });
+
+        assert_eq!(
+            codegen.emitted_code,
+            "for (i = 0; i < 3; i++) {\n    work();\n}\n"
+        );
     }
 }
