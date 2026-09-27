@@ -121,3 +121,10 @@ do
   bs
 end
 ```
+
+## Codegen
+Lilac supports two backends for code generation:
+- **C**: C backend using `lilac_msg_send` in-place of `objc_msgSend`
+- **Objective-C**: Objective-C `@protocol/@interface/@implementation` using native `objc_msgSend`
+
+Neither backend is currently complete, though the Objective C one is more usable.
