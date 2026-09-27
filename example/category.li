@@ -1,0 +1,9 @@
+protocol Functor' f
+  message map (self: f a, transform: \(a -> b)) -> f b
+end
+
+protocol Monad' m
+  message bind (self: m a, to: \(a -> m b)) -> m b
+  static message pure (value: a) -> m a
+end
+

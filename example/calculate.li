@@ -1,0 +1,31 @@
+def filter-evens(nums: #[i32]) -> #[i32] =
+  [nums filter predicate:|x| x % 2 == 0]
+
+-- Define a message for nicer summing
+struct Calc
+  res: i32
+end
+
+protocol Calc'
+  static message init () -> impl Calc'
+  message add (self: impl Calc', _first: i32, and: i32) -> impl Calc'
+  message subtract (self: impl Calc', _first: i32, and: i32) -> impl Calc'
+  message multiply (self: impl Calc', _first: i32, by: i32) -> impl Calc'
+  message resulting-in (self: impl Calc') -> i32
+and
+
+implement Calc' on Calc
+  static message init () = Calc { res: 0 }
+  message add (self: impl Calc', _first: i32, and: i32) = Calc with { res: _first + and }
+  message subtract(self: impl Calc', _first: i32, and: i32) = Calc with { res: _first - and }
+  message multiply(self: impl Calc', _first: i32, by: i32) = Calc with { res: _first * by }
+  message resulting-in (self: impl Calc') = self
+end
+
+def perform-calculations() -> i32 = do
+  let calc  = [Calc init] in
+  let calc' = [calc  add: 2 and: 4] in
+  let calc''= [calc' multiply: 3 by: 2] in
+  let res   = [calc'' resulting-in] in
+  res
+end
