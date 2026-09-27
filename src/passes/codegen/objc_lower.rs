@@ -3,10 +3,8 @@
 //! NOTE: This is the most complete backend currently, as the C and JS backend would require re-implementing
 //! objc_msgSend and retain/release functions.
 
-use crate::{
-    ast,
-    passes::objc_ast::{ObjCExpr, ObjCImplementation, ObjCInterface, ObjCItem, ObjCProtocol},
-};
+use super::objc_ast::*;
+use crate::ast;
 
 pub struct LowerCtx {
     // Objective-C constructs collected during lowering

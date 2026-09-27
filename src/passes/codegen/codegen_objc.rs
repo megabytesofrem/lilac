@@ -3,7 +3,8 @@
 //! NOTE: This is the most complete backend currently, as the C and JS backend would require re-implementing
 //! objc_msgSend and retain/release functions.
 
-use crate::{ast, passes::objc_ast::*};
+use super::objc_ast::*;
+use crate::ast;
 
 /// Context for Objective-C code generation
 pub struct CodegenCtx {
