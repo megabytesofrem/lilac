@@ -1,8 +1,9 @@
 ## A few notes
 
+### Functional Core, Imperative Shell
+
 Functional core, imperative shell. A majority of the code-base *should* be purely functional and Lilac
-employs the existence of concepts from category theory (and Haskell) such as functors, applicatives, monads -
-minus monad transformers: they stack naturally by protocols.
+employs the existence of concepts from category theory (and Haskell) such as functors, applicatives, monads - minus monad transformers: they stack *naturally* via `protocol`s.
 
 ```
 struct Ctx
@@ -28,15 +29,35 @@ def main () -> IO () = do
 end
 ```
 
+<details>
+<summary>Intermediate passes used in Lilac's compiler</summary>
 
-Message/selector call syntax:
+### Passes
+
+```mermaid
+flowchart TD
+    A[AST] -->|Typecheck| B[TypedAST]
+    B --> C[High-level IR]
+    C -->D[SSA]
+    D -->E[Ref-count insertion]
+    E-->F{Target Backend}
+    F -->|Objective  C| ObjCBackend(Objective C Backend)
+    F -->|C| CBackend(C\n Backend)
 ```
+
+</details>
+
+
+### Message Selectors
+
+#### Message/selector call syntax:
+```objc
 [String by-appending-string: "Hello world"]   -- static message on type
 [prime-numbers filtered-by: |n| [n is-even]]  -- single argument
 [contents write-to-file-named: "file.txt" encoding: utf-8] -- multi-argument
 ```
 
-Lilac's equivalent to NSObject:
+#### Lilac's equivalent to NSObject:
 ```
 protocol Object'
   message superclass (self: impl Object') -> impl Class'
@@ -45,17 +66,35 @@ protocol Object'
 end
 ```
 
-Data lives in one of two places: on the stack, on the heap. Lilac provides
-`*T` for raw pointers, and `@T` for pointers that are reference counted by a small ARC runtime.
+Data lives in one of two places: on the stack or on the heap. 
+
+Lilac provides both raw (`*T`) and ARC pointers (`@T`) for data stored on the heap.
 
 ARC is entirely opt-in and the backend emits `lilac_retain` and `lilac_release` to
-automatically manage memory.
+automatically manage memory behind the scenes.
 
+#### Message Dispatch
 
-Message dispatch is routed using Lilacs equivalent to `objc_msgSend` - `lilac_msg_send`
+Message dispatch is routed using Lilacs equivalent to `objc_msgSend` - `lilac_msgsend`
+
+`lilac_msgsend` is an extremely fast trampoline written in pure Assembly which jumps to a selector
+without the overhead of a C function call (and its prologue and epologue), deferring only to a slower
+C based implementation if the cache hit fails. 
+
 ```c
-lilac_msg_send(contents, SEL("write-to-file-named:encoding"), "file.txt", "utf-8");
+// 1. Interned Selector String Literals
+static const char __sel_str_write_to_file_named_encoding[] __attribute__((section(".rodata.lilac_strs"))) = "write-to-file-named:encoding:";
+
+// 2. Global Weak Handles (Coalesced into 1 unique memory address at link time)
+__attribute__((weak, section(".data.rel.ro.lilac_sels")))
+const void *sel_write_to_file_named_encoding_ = (const void *)__sel_str_write_to_file_named_encoding;
+
+// 3. Message dispatch using lilac_msgsend on the selector
+lilac_msgsend(contents, SEL(write_to_file_named_encoding), "file.txt", "utf-8");
+
 ```
 
-For reference, this is Apple's implementation:
+It is an experimental cross-platform implementation of `objc_msgSend`, that works entirely freestanding.
+
+For reference, this is Apple's implementation of `objc_msgSend`:
 https://developer.apple.com/documentation/objectivec/objc_msgsend
