@@ -12,9 +12,9 @@ use winnow::{
 
 use super::{keyword, lexeme, p_type, skip_ws, symbol};
 
-use crate::ast::BinaryOp;
 use crate::ast::Expr;
 use crate::ast::Literal;
+use crate::ast::operator::BinaryOp;
 use crate::ast::types;
 
 const KEYWORDS: &[&str] = &[

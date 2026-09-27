@@ -261,13 +261,13 @@ pub enum ObjCExpr {
     Ident(String),
 
     Binary {
-        op: ast::BinaryOp,
+        op: ast::operator::BinaryOp,
         lhs: Box<ObjCExpr>,
         rhs: Box<ObjCExpr>,
     },
 
     Unary {
-        op: ast::UnaryOp,
+        op: ast::operator::UnaryOp,
         expr: Box<ObjCExpr>,
     },
 

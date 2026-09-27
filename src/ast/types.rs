@@ -23,6 +23,11 @@ pub enum Type {
 
     // Raw pointer type: *T
     Pointer(Box<Type>),
+
+    Function {
+        parameters: Vec<Type>,
+        return_type: Box<Type>,
+    },
 }
 
 impl Type {

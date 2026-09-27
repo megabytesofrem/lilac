@@ -488,7 +488,7 @@ mod tests {
             },
             body: vec![ObjCStmt::Return {
                 value: Some(ObjCExpr::Binary {
-                    op: ast::BinaryOp::Mul,
+                    op: ast::operator::BinaryOp::Mul,
                     lhs: Box::new(ObjCExpr::Ident("width".into())),
                     rhs: Box::new(ObjCExpr::Ident("height".into())),
                 }),
@@ -516,7 +516,7 @@ mod tests {
             },
             body: vec![ObjCStmt::Return {
                 value: Some(ObjCExpr::Binary {
-                    op: ast::BinaryOp::Mul,
+                    op: ast::operator::BinaryOp::Mul,
                     lhs: Box::new(ObjCExpr::Ident("width".into())),
                     rhs: Box::new(ObjCExpr::Ident("height".into())),
                 }),
@@ -540,10 +540,10 @@ mod tests {
     fn emits_expressions() {
         let mut codegen = CodegenCtx::new();
         codegen.emit_expr(ObjCExpr::Binary {
-            op: ast::BinaryOp::Add,
+            op: ast::operator::BinaryOp::Add,
             lhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(1))),
             rhs: Box::new(ObjCExpr::Binary {
-                op: ast::BinaryOp::Mul,
+                op: ast::operator::BinaryOp::Mul,
                 lhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(2))),
                 rhs: Box::new(ObjCExpr::Lit(ast::Literal::Int(3))),
             }),

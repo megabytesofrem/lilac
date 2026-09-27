@@ -1,6 +1,10 @@
 //! Static Single Assignment (SSA) pass for the Lilac compiler.
 
-use crate::ast::{BinaryOp, Literal, UnaryOp, types::Type};
+use crate::ast::{
+    Literal,
+    operator::{BinaryOp, UnaryOp},
+    types::Type,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId(pub u32);
