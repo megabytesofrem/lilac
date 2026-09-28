@@ -6,71 +6,69 @@
 #ifndef LILAC_RUNTIME_H
 #define LILAC_RUNTIME_H
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
 #include <stdatomic.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-// Class structure for Lilac objects.
-typedef struct LilacClass LilacClass;
+typedef LilacObject* (*IMP)(LilacObject* receiver, const char* sel, ...);
 
-typedef struct
-{
-    LilacClass *cls;
-    _Atomic uint64_t ref_count;
-} LilacClassHeader;
-
-typedef struct
-{
-    const void *selector;
-    void *method;
+typedef struct LilacCacheEntry {
+    const char* sel;
+    IMP method;
 } LilacCacheEntry;
 
-// Trampoline function for message sending, defined in lilac_msgsend.s
-extern void *lilac_msgsend(void *receiver, const void *selector, ...);
+/**
+ * Object header structure for Lilac's runtime
+ *
+ * NOTE: Lilac allocates objects with `LilacObjectHdr` before the object data.
+ *
+ * Memory layout:
+ * =================================
+ * [ -16 bytes: LilacClass* isa ]
+ * [ -8 bytes:  uintptr_t retain_count ]
+ * [  0 bytes:  LilacObject data, self pointer ]
+ */
+typedef struct LilacObjectHdr {
+    LilacClass* isa;
+    uintptr_t retain_count;
+} LilacObjectHdr;
 
-static inline void *lilac_msgsend_slow_path(void *receiver, const void *selector, ...)
-{
-    // TODO: Implement the slow path for message sending here.
-    // This is the fallback for cache misses in lilac_msgsend.s.
-    return NULL;
-}
+typedef struct LilacObject {
+} LilacObject;
 
-static inline void *lilac_alloc(size_t size)
-{
-    LilacClassHeader *hdr = (LilacClassHeader *)malloc(sizeof(LilacClassHeader) + size);
-    if (!hdr)
-        return NULL;
+/**
+ * Class metadata structure for Lilac's runtime
+ *
+ * - superclass: pointer to the superclass of this class.
+ * - cache_mask: mask used for indexing into the method cache.
+ * - cache_entries: pointer to the array of method cache entries.
+ */
+typedef struct LilacClass {
+    LilacClass* superclass;
+    uintptr_t cache_mask;           /* CACHE_MASK_OFFSET */
+    LilacCacheEntry* cache_entries; /* CACHE_BASE_OFFSET */
 
-    // Set the class pointer to NULL initially.
-    hdr->cls = NULL;
+    /* Additional class metadata can be added here */
+} LilacClass;
 
-    // Initialize the reference count to 1 before returning the allocated memory.
-    atomic_init(&hdr->ref_count, 1);
-    return (void *)(hdr + 1);
-}
+/* =======================================================
+ * C API prototypes
+ * =======================================================
+ */
 
-static inline void lilac_retain(void *obj)
-{
-    if (!obj)
-        return;
+const char* lilac_sel_registername(const char* name);
+LilacObjectHdr* lilac_get_object_hdr(LilacObject* self);
+LilacObject* lilac_object_alloc(LilacClass* cls, size_t size);
+LilacObject* lilac_retain(LilacObject* self);
+LilacObject* lilac_release(LilacObject* self);
+static LilacClass* lilac_get_class(LilacObject* self);
 
-    // Increment the reference count of the object by 1
-    LilacClassHeader *hdr = ((LilacClassHeader *)obj) - 1;
-    atomic_fetch_add(&hdr->ref_count, 1);
-}
+/* Assembly trampolines */
+extern LilacObject* lilac_msgsend(LilacObject* self, const char* sel, ...);
+extern double lilac_msgsend_fpret(LilacObject* self, const char* sel, ...);
+extern void lilac_msgsend_stret(void* sret_buf, LilacObject* self,
+                                const char* sel, ...);
+IMP lilac_msgsend_slow_path(LilacObject* self, const char* sel, ...);
 
-static inline void lilac_release(void *obj)
-{
-    if (!obj)
-        return;
-
-    // Decrement the reference count of the object by 1
-    LilacClassHeader *hdr = ((LilacClassHeader *)obj) - 1;
-
-    // Free the object if the reference count reaches zero.
-    if (atomic_fetch_sub(&hdr->ref_count, 1) == 1)
-        free(hdr);
-}
-
-#endif // LILAC_RUNTIME_H
+#endif  // LILAC_RUNTIME_H
