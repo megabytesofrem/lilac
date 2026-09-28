@@ -12,7 +12,10 @@ use winnow::{
 
 use super::{keyword, lexeme, p_type, skip_ws, symbol};
 
+use crate::ast::DoBlock;
+use crate::ast::DoStatement;
 use crate::ast::Expr;
+use crate::ast::LetBinding;
 use crate::ast::Literal;
 use crate::ast::operator::BinaryOp;
 use crate::ast::types;
@@ -244,10 +247,12 @@ pub fn p_member_expr<'s>(input: &mut &'s str) -> Result<Expr> {
 fn p_application_primary<'s>(input: &mut &'s str) -> Result<Expr> {
     alt((
         // Keyword forms must come before identifiers
+        p_do_block,
         p_let_expr,
         p_for_expr,
         p_until_expr,
         p_selector_call,
+        p_lambda_expr,
         p_literal.map(Expr::Lit),
         p_identifier.map(Expr::Ident),
         p_array_expr,
@@ -255,6 +260,19 @@ fn p_application_primary<'s>(input: &mut &'s str) -> Result<Expr> {
         delimited(symbol("("), p_expr, symbol(")")),
     ))
     .parse_next(input)
+}
+
+fn p_lambda_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    // Lambda expression: |parameter| body
+
+    // TODO: support multiple parameters in the lambda expression.
+    // TODO: support optional type annotations for lambda parameters.
+    (symbol("|"), p_identifier, symbol("|"), p_expr)
+        .map(|(_, parameter, _, body)| Expr::Lambda {
+            parameter,
+            body: Box::new(body),
+        })
+        .parse_next(input)
 }
 
 pub fn p_application_expr<'s>(input: &mut &'s str) -> Result<Expr> {
@@ -306,17 +324,98 @@ pub fn p_selector_call<'s>(input: &mut &'s str) -> Result<Expr> {
 
 pub fn p_block<'s>(input: &mut &'s str) -> Result<Expr> {
     // Block expression enclosed in curly braces, with statements separated by semicolons or whitespace.
-    // do
+    // block
     //  as
     //  bs
     // end
 
     lexeme((
-        keyword("do"),
+        keyword("block"),
         separated(0.., p_expr, alt((symbol(";"), multispace1))),
         keyword("end"),
     ))
     .map(|(_, statements, _)| Expr::Block(statements))
+    .parse_next(input)
+}
+
+pub fn p_let_binding_in_do<'s>(input: &mut &'s str) -> Result<LetBinding> {
+    lexeme((
+        keyword("let"),
+        p_optionally_typed_identifier,
+        symbol("<-"),
+        p_expr,
+    ))
+    .map(|(_, (name, opt_type), _, value)| LetBinding {
+        name,
+        opt_type,
+        value,
+    })
+    .parse_next(input)
+}
+
+pub fn p_do_block<'s>(input: &mut &'s str) -> Result<Expr> {
+    // Do block expression
+
+    // This is different than a regular block expression because `do` blocks are desugared to monadic bind
+    // chains where each `let` binding introduces a new monadic bind.
+
+    // do
+    //   let x <- [producer  produce];
+    //   let y <- [producer2 produce];
+    //   [Console show: [x add: y]]
+    // end
+
+    // Desugars to the form:
+    //
+    // [producer transform: |x|
+    //   [producer2 transform: |y|
+    //      [Console show: [x add: y]]]
+    //
+    // NOTE: For obvious reasons, this is not very readable (infact it is less readable than Haskell),
+    // so do-blocks should be used frequently to avoid having to write manual bind chains.
+
+    lexeme((
+        keyword("do"),
+        repeat(
+            0..,
+            terminated(
+                alt((
+                    p_let_binding_in_do.map(DoStatement::Binding),
+                    p_expr.map(DoStatement::Expression),
+                )),
+                symbol(";"),
+            ),
+        )
+        .fold(
+            || Vec::new(),
+            |mut statements, statement| {
+                statements.push(statement);
+                statements
+            },
+        ),
+        keyword("end"),
+    ))
+    .map(|(_, statements, _)| {
+        let mut bindings = Vec::new();
+        let mut exprs = Vec::new();
+
+        for statement in statements {
+            match statement {
+                DoStatement::Binding(binding) => bindings.push(binding),
+                DoStatement::Expression(expr) => exprs.push(expr),
+            }
+        }
+
+        let trailing_expr = exprs.pop();
+
+        // Construct the DoBlock expression with the collected bindings, expressions,
+        // and trailing expression.
+        Expr::DoBlock(Box::new(DoBlock {
+            bindings,
+            exprs,
+            trailing_expr,
+        }))
+    })
     .parse_next(input)
 }
 

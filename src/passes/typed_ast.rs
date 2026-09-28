@@ -33,6 +33,11 @@ pub enum TypedExprKind {
         expr: Box<TypedExpr>,
     },
 
+    Lambda {
+        parameter: String,
+        body: Box<TypedExpr>,
+    },
+
     Member {
         object: Box<TypedExpr>,
         member: String,
@@ -77,7 +82,20 @@ pub enum TypedExprKind {
         body: Box<TypedExpr>,
     },
 
+    DoBlock {
+        bindings: Vec<TypedLetBinding>,
+        exprs: Vec<TypedExpr>,
+        trailing_expr: Option<Box<TypedExpr>>,
+    },
+
     Block(Vec<TypedExpr>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedLetBinding {
+    pub name: String,
+    pub declared_type: Option<Type>,
+    pub value: TypedExpr,
 }
 
 #[derive(Debug, Clone, PartialEq)]

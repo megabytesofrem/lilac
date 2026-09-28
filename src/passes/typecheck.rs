@@ -1,9 +1,9 @@
 use crate::ast::operator::{BinaryOp, UnaryOp};
 use crate::ast::types::Type;
-use crate::ast::{Expr, Item, Literal};
+use crate::ast::{DoBlock, Expr, Item, Literal};
 use crate::passes::typed_ast::{
-    TypedExpr, TypedExprKind, TypedField, TypedItem, TypedMessage, TypedMessageHandler,
-    TypedParameter,
+    TypedExpr, TypedExprKind, TypedField, TypedItem, TypedLetBinding, TypedMessage,
+    TypedMessageHandler, TypedParameter,
 };
 
 /// Typechecker result type.
@@ -114,6 +114,9 @@ impl TypeChecker {
                     ty,
                 ))
             }
+            Expr::Lambda { .. } => Err(TypeError::Unsupported(
+                "lambda inference requires an expected function type",
+            )),
             Expr::Call { callee, arguments } => self.infer_call(callee, arguments),
             Expr::Let {
                 name,
@@ -207,6 +210,7 @@ impl TypeChecker {
                     Type::Unit,
                 ))
             }
+            Expr::DoBlock(block) => self.infer_do_block(block),
             Expr::Block(expressions) => {
                 let typed = expressions
                     .iter()
@@ -227,6 +231,39 @@ impl TypeChecker {
     }
 
     pub fn check_expr(&mut self, expr: &Expr, expected: &Type) -> TypeResult<TypedExpr> {
+        if let Expr::Lambda { parameter, body } = expr {
+            let Type::Function {
+                parameters,
+                return_type,
+            } = expected
+            else {
+                return Err(TypeError::TypeMismatch {
+                    expected: expected.clone(),
+                    actual: Type::Named("lambda".into()),
+                });
+            };
+            if parameters.len() != 1 {
+                return Err(TypeError::ArityMismatch {
+                    expected: 1,
+                    actual: parameters.len(),
+                });
+            }
+            let mut lambda_checker = Self {
+                env: self.env.child(),
+            };
+            lambda_checker
+                .env
+                .define(parameter.clone(), parameters[0].clone());
+            let typed_body = lambda_checker.check_expr(body, return_type)?;
+            return Ok(TypedExpr::new(
+                TypedExprKind::Lambda {
+                    parameter: parameter.clone(),
+                    body: Box::new(typed_body),
+                },
+                expected.clone(),
+            ));
+        }
+
         let typed = self.infer_expr(expr)?;
 
         // Check if the inferred type matches the expected type
@@ -370,6 +407,52 @@ impl TypeChecker {
         Ok(TypedExpr::new(
             TypedExprKind::Array(typed),
             Type::Array(Box::new(element_type)),
+        ))
+    }
+
+    fn infer_do_block(&mut self, block: &DoBlock) -> TypeResult<TypedExpr> {
+        let mut block_checker = Self {
+            env: self.env.child(),
+        };
+        let mut bindings = Vec::with_capacity(block.bindings.len());
+
+        for binding in &block.bindings {
+            let value = match &binding.opt_type {
+                Some(expected) => block_checker.check_expr(&binding.value, expected)?,
+                None => block_checker.infer_expr(&binding.value)?,
+            };
+            let value_type = value.ty.clone();
+            block_checker.env.define(binding.name.clone(), value_type);
+            bindings.push(TypedLetBinding {
+                name: binding.name.clone(),
+                declared_type: binding.opt_type.clone(),
+                value,
+            });
+        }
+
+        let exprs = block
+            .exprs
+            .iter()
+            .map(|expr| block_checker.infer_expr(expr))
+            .collect::<TypeResult<Vec<_>>>()?;
+        let trailing_expr = block
+            .trailing_expr
+            .as_ref()
+            .map(|expr| block_checker.infer_expr(expr).map(Box::new))
+            .transpose()?;
+        let ty = trailing_expr
+            .as_ref()
+            .map(|expr| expr.ty.clone())
+            .or_else(|| exprs.last().map(|expr| expr.ty.clone()))
+            .unwrap_or(Type::Unit);
+
+        Ok(TypedExpr::new(
+            TypedExprKind::DoBlock {
+                bindings,
+                exprs,
+                trailing_expr,
+            },
+            ty,
         ))
     }
 

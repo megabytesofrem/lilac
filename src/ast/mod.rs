@@ -40,6 +40,11 @@ pub enum Expr {
         expr: Box<Expr>,
     },
 
+    Lambda {
+        parameter: String,
+        body: Box<Expr>,
+    },
+
     // Member access expression: object.member
     Member(Box<Expr>, String),
 
@@ -87,7 +92,35 @@ pub enum Expr {
         body: Box<Expr>,
     },
 
+    DoBlock(Box<DoBlock>),
+
     Block(Vec<Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DoStatement {
+    Binding(LetBinding),
+    Expression(Expr),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LetBinding {
+    pub name: String,
+    pub opt_type: Option<types::Type>,
+    pub value: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DoBlock {
+    // Bindings introduced in the do block
+    pub bindings: Vec<LetBinding>,
+
+    // Expressions within the do block
+    pub exprs: Vec<Expr>,
+
+    // The trailing expression of the do block, if any.
+    // Used for the result of the do block
+    pub trailing_expr: Option<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
