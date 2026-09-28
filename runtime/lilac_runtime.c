@@ -8,13 +8,22 @@ const char* lilac_sel_registername(const char* name) {
     return name;
 }
 
+LilacClass* lilac_get_class(LilacObject* self) {
+    if (!self) return NULL;
+
+    LilacObjectHdr* hdr = lilac_get_object_hdr(self);
+
+    /* Return the class pointer (isa) from the object header. */
+    return hdr->isa;
+}
+
 LilacObjectHdr* lilac_get_object_hdr(LilacObject* self) {
     if (!self) return NULL;
 
     return (LilacObjectHdr*)self - 1;
 }
 
-LilacObject* lilac_object_alloc(LilacClass* cls, size_t size) {
+LilacObject* lilac_alloc(LilacClass* cls, size_t size) {
     size_t total_size = sizeof(LilacObjectHdr) + size;
     LilacObjectHdr* hdr = (LilacObjectHdr*)calloc(1, total_size);
 
@@ -26,6 +35,16 @@ LilacObject* lilac_object_alloc(LilacClass* cls, size_t size) {
     /* Return a pointer to the object data, which is located immediately after
      * the header. */
     return (LilacObject*)(hdr + 1);
+}
+
+void lilac_dealloc(LilacObject* self) {
+    if (!self) return;
+
+    /* Deallocate the object by freeing its object header. */
+    LilacObjectHdr* hdr = lilac_get_object_hdr(self);
+    free(hdr);
+
+    return;
 }
 
 LilacObject* lilac_retain(LilacObject* self) {

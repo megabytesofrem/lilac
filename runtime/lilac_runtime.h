@@ -58,11 +58,14 @@ typedef struct LilacClass {
  */
 
 const char* lilac_sel_registername(const char* name);
+LilacClass* lilac_get_class(LilacObject* self);
+
 LilacObjectHdr* lilac_get_object_hdr(LilacObject* self);
-LilacObject* lilac_object_alloc(LilacClass* cls, size_t size);
+LilacObject* lilac_alloc(LilacClass* cls, size_t size);
+void lilac_dealloc(LilacObject* self);
+
 LilacObject* lilac_retain(LilacObject* self);
 LilacObject* lilac_release(LilacObject* self);
-static LilacClass* lilac_get_class(LilacObject* self);
 
 /* Assembly trampolines */
 extern LilacObject* lilac_msgsend(LilacObject* self, const char* sel, ...);
