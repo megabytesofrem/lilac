@@ -67,21 +67,36 @@ flowchart TD
 [contents write-to-file-named: "file.txt" encoding: utf-8] -- multi-argument
 ```
 
-#### Lilac's equivalent to NSObject:
+#### lilac-runtime
+
+Lilac mirrors the core Objective-C runtime nearly 1:1 and provides a nearly drop-in, cross-platform replacement for Apple's `libobjc.A.dylib` runtime.
+
+| Lilac Function               | Objective C Function       |
+|------------------------------|----------------------------|
+| `lilac_sel_registername`     | `sel_registerName`         |
+| `lilac_msgsend`              | `objc_msgSend`             |
+| `lilac_msgsend_stret`        | `objc_msgSend_stret`       |
+| `lilac_msgsend_fpret`        | `objc_msgSend_fpret`       |
+| `lilac_msgsend_super`        | `objc_msgSendSuper`        |
+| `lilac_retain`               | `objc_retain`              |
+| `lilac_release`              | `objc_release`             |
+| `lilac_autoreleasepool_push` | `objc_autoreleasepoolPush` |
+| `lilac_autoreleasepool_pop`  | `objc_autoreleasepoolPop`  |
+| `lilac_autorelease`          | `objc_autorelease`         |
+
+| Lilac Type    | Objective C | Description                                               |
+|---------------|-------------|-----------------------------------------------------------|
+| `LilacClass`  | `AnyClass`  | The protocol to which all class types implicitly conform. |
+| `LilacObject` | `NSObject`  | The root class of Lilac object hierarchies                |
+
+Lilac has its own equivalent to `NSObject`, called `LilacObject`
 ```
-protocol Object'
-  message superclass (self: impl Object') -> impl Class'
-  message is-equal (self: impl Object') -> bool
-  message hash (self: impl Object') -> i64
+protocol LilacObject'
+  message superclass (self: impl LilacObject') -> impl Class'
+  message is-equal (self: impl LilacObject') -> bool
+  message hash (self: impl LilacObject') -> i64
 end
 ```
-
-Data lives in one of two places: on the stack or on the heap. 
-
-Lilac provides both raw (`*T`) and ARC pointers (`@T`) for data stored on the heap.
-
-ARC is entirely opt-in and the backend emits `lilac_retain` and `lilac_release` to
-automatically manage memory behind the scenes.
 
 #### Message Dispatch
 
@@ -108,3 +123,5 @@ It is an experimental cross-platform implementation of `objc_msgSend`, that work
 
 For reference, this is Apple's implementation of `objc_msgSend`:
 https://developer.apple.com/documentation/objectivec/objc_msgsend
+
+https://developer.apple.com/documentation/objectivec
