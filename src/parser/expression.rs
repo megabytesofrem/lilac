@@ -669,6 +669,21 @@ mod tests {
     }
 
     #[test]
+    fn do_block_parse() {
+        let source = r#"do
+    let x: Maybe i32 <- [Just value: 5];
+    let y: Maybe i32 <- [Just value: 6];
+    let z: Maybe i32 <- [Just [x apply: |c| c + 1]];
+    [Console show: [z describe]];
+end"#;
+
+        assert!(matches!(parse(source), Expr::DoBlock(block)
+            if block.bindings.len() == 3
+                && block.exprs.is_empty()
+                && block.trailing_expr.is_some()));
+    }
+
+    #[test]
     fn reserved_words_are_not_identifiers() {
         let mut input = "let for in do";
         assert!(p_identifier(&mut input).is_err());

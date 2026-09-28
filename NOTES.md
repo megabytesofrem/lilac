@@ -30,6 +30,16 @@ end
 ```
 
 <details>
+<summary>Lilac's goals</summary>
+
+- Haskell grade type safety and flexibility
+- Objective-C inspired syntax with Smalltalk messaging ("The One True OOP")
+- A runtime so small, and bare bones that it can be used on resource constrained systems (< 4 MB of RAM total)
+- Bare metal support using a tiny ARC (`lilac_retain`/`lilac_release`)
+
+</details>
+
+<details>
 <summary>Intermediate passes used in Lilac's compiler</summary>
 
 ### Passes
