@@ -1,14 +1,28 @@
 # lilac
-Tiny easily embeddable functional programming language inspired by Objective-C
+Tiny functional programming language inspired by Objective-C/Smalltalk designed for systems programming. 
 
 ## Hello World
 ```
--- IO *is* a monad
 def main () -> IO () = do
-  -- send a message to Console, the equivalent to Smalltalk's Transcript
-  [Console show: "Hello world!"]
-  [IO pure]
+  -- Send a message to Console, the equivalent to Smalltalk's Transcript
+  Console show: "Hello world!"
+
+  -- Send the pure message to the IO monad, yielding a successfully unitary result.
+  IO pure
 end
+```
+
+## Foreign Messages
+Lilac does not support free-form C function calls, so functions written in C must be exposed as messages.
+
+```
+protocol MyC
+  -- C functions can *only* be static
+  foreign static message "add_two":add-two (_:first: i32, _:second: i32) -> i32
+end
+
+-- Use it like so 
+MyC add-two first: 2 second: 4
 ```
 
 ## Typeclasses as Protocols
