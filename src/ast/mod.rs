@@ -73,17 +73,6 @@ pub enum Expr {
         new_props: Vec<(String, Expr)>,
     },
 
-    For {
-        iterator: String,
-        iterable: Box<Expr>,
-        body: Box<Expr>,
-    },
-
-    Until {
-        condition: Box<Expr>,
-        body: Box<Expr>,
-    },
-
     DoBlock(Box<DoBlock>),
 
     Block(Vec<Expr>),

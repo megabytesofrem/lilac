@@ -202,40 +202,6 @@ pub fn p_let_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     .parse_next(input)
 }
 
-pub fn p_for_expr<'s>(input: &mut &'s str) -> Result<Expr> {
-    // For expression: for <iterator> in <iterable> do <body>
-    lexeme((
-        keyword("for"),
-        p_identifier,
-        keyword("in"),
-        p_expr,
-        keyword("do"),
-        p_expr,
-    ))
-    .map(|(_, iterator, _, iterable, _, body)| Expr::For {
-        iterator,
-        iterable: Box::new(iterable),
-        body: Box::new(body),
-    })
-    .parse_next(input)
-}
-
-#[rustfmt::skip]
-pub fn p_until_expr<'s>(input: &mut &'s str) -> Result<Expr> {
-    // Until expression: until <condition> do <body>
-    lexeme((
-        keyword("until"),
-        p_expr,
-        keyword("do"),
-        p_expr,
-    ))
-    .map(|(_, condition, _, body)| Expr::Until {
-        condition: Box::new(condition),
-        body: Box::new(body),
-    })
-    .parse_next(input)
-}
-
 pub fn p_member_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     // Member access expression: object.member
     lexeme((p_expr, symbol("."), p_identifier))
@@ -248,8 +214,6 @@ fn p_primary<'s>(input: &mut &'s str) -> Result<Expr> {
         // Keyword forms must come before identifiers
         p_do_block,
         p_let_expr,
-        p_for_expr,
-        p_until_expr,
         p_lambda_expr,
         p_literal.map(Expr::Lit),
         p_identifier.map(Expr::Ident),
@@ -652,8 +616,6 @@ mod tests {
     #[test]
     fn let_for_until_parse() {
         assert!(matches!(parse("let x = f y in x"), Expr::Let { name, .. } if name == "x"));
-        assert!(matches!(parse("for i in xs do i"), Expr::For { iterator, .. } if iterator == "i"));
-        assert!(matches!(parse("until done do step"), Expr::Until { .. }));
     }
 
     #[test]

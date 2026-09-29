@@ -80,20 +80,6 @@ impl LowerCtx {
                 ObjCExpr::Sentinel
             }
 
-            ast::Expr::For { .. } => {
-                self.worklist_to_lower.push(expr);
-
-                // Return a sentinel because we cannot directly lower for expressions to Objective-C
-                ObjCExpr::Sentinel
-            }
-
-            ast::Expr::Until { .. } => {
-                self.worklist_to_lower.push(expr);
-
-                // Return a sentinel because we cannot directly lower until expressions to Objective-C
-                ObjCExpr::Sentinel
-            }
-
             ast::Expr::Block { .. } => {
                 self.worklist_to_lower.push(expr);
 

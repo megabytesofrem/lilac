@@ -160,42 +160,6 @@ impl TypeChecker {
                     typed_target.ty,
                 ))
             }
-            Expr::For {
-                iterator,
-                iterable,
-                body,
-            } => {
-                let typed_iterable = self.infer_expr(iterable)?;
-                let mut body_checker = Self {
-                    env: self.env.child(),
-                };
-                body_checker
-                    .env
-                    .define(iterator.clone(), Type::Named("IteratorItem".into()));
-
-                // Infer the type of the body expression within the new environment.
-                let typed_body = body_checker.infer_expr(body)?;
-
-                Ok(TypedExpr::new(
-                    TypedExprKind::For {
-                        iterator: iterator.clone(),
-                        iterable: Box::new(typed_iterable),
-                        body: Box::new(typed_body),
-                    },
-                    Type::Unit,
-                ))
-            }
-            Expr::Until { condition, body } => {
-                let typed_condition = self.check_expr(condition, &Type::Bool)?;
-                let typed_body = self.infer_expr(body)?;
-                Ok(TypedExpr::new(
-                    TypedExprKind::Until {
-                        condition: Box::new(typed_condition),
-                        body: Box::new(typed_body),
-                    },
-                    Type::Unit,
-                ))
-            }
             Expr::DoBlock(block) => self.infer_do_block(block),
             Expr::Block(expressions) => {
                 let typed = expressions
