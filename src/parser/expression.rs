@@ -5,19 +5,18 @@ use winnow::token::{any, one_of, take_while};
 use winnow::{
     ascii::multispace1,
     combinator::{
-        Infix, Postfix, alt, delimited, dispatch, expression, fail, not, opt, preceded, repeat,
-        separated, terminated,
+        Postfix, alt, delimited, expression, not, opt, preceded, repeat, separated, terminated,
     },
 };
 
 use super::{keyword, lexeme, p_type, skip_ws, symbol};
 
+use crate::ast::CallArity;
 use crate::ast::DoBlock;
 use crate::ast::DoStatement;
 use crate::ast::Expr;
 use crate::ast::LetBinding;
 use crate::ast::Literal;
-use crate::ast::operator::BinaryOp;
 use crate::ast::types;
 
 const KEYWORDS: &[&str] = &[
@@ -308,6 +307,7 @@ fn p_unary_chain<'s>(input: &mut &'s str) -> Result<Expr> {
                 .into_iter()
                 .fold(receiver, |target, selector| Expr::SelectorCall {
                     target: Box::new(target),
+                    arity: CallArity::Unary,
                     selector,
                     args: Vec::new(),
                 })
@@ -412,104 +412,21 @@ pub fn p_do_block<'s>(input: &mut &'s str) -> Result<Expr> {
     .parse_next(input)
 }
 
-// Binary/comparison/assignment layer, with `with` postfix. The base operand is a
-// unary message chain (Smalltalk unary sends bind tighter than binary operators).
-fn p_binary_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+// A Smalltalk binary selector: one or more operator characters, e.g. `+`, `==`, `<=`.
+// Binary messages all share one precedence level and associate left-to-right, so
+// there's no per-operator dispatch table like a Pratt parser would use.
+fn p_binary_selector<'s>(input: &mut &'s str) -> Result<String> {
+    // TODO: Allow unicode operator characters as well.
+    let valid_chars = "+-*/<>=!$%@";
+
+    lexeme(take_while(1.., |c: char| "+-*/<>=!".contains(c)))
+        .map(ToString::to_string)
+        .parse_next(input)
+}
+
+// A unary chain, plus the `with` postfix message (binds tighter than binary messages).
+fn p_operand<'s>(input: &mut &'s str) -> Result<Expr> {
     expression(p_unary_chain)
-        .infix(preceded(
-            skip_ws,
-            terminated(
-                dispatch! { any;
-                    '+' => Infix::Left(10, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    '-' => Infix::Left(10, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Sub,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    '*' => Infix::Left(20, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Mul,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    '/' => Infix::Left(20, |_, lhs, rhs| {
-                        Ok(Expr::Binary {
-                            op: BinaryOp::Div,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
-                        })
-                    }),
-                    '=' => alt((
-                        '='.value(Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Eq,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        })),
-                        Infix::Right(1, |_, target, value| {
-                            Ok(Expr::Assign {
-                                target: Box::new(target),
-                                value: Box::new(value),
-                            })
-                        }),
-                    )),
-                    '!' => dispatch! { any;
-                        '=' => Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Ne,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        }),
-                        _ => fail,
-                    },
-                    '<' => dispatch! { any;
-                        '=' => Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Le,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        }),
-                        _ => Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Lt,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        }),
-                    },
-                    '>' => dispatch! { any;
-                        '=' => Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Ge,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        }),
-                        _ => Infix::Left(5, |_, lhs, rhs| {
-                            Ok(Expr::Binary {
-                                op: BinaryOp::Gt,
-                                lhs: Box::new(lhs),
-                                rhs: Box::new(rhs),
-                            })
-                        }),
-                    },
-                    _ => fail,
-                },
-                skip_ws,
-            ),
-        ))
         .postfix(preceded(
             (skip_ws, keyword("with")),
             // <target> with { name: value, ... }
@@ -531,6 +448,39 @@ fn p_binary_expr<'s>(input: &mut &'s str) -> Result<Expr> {
                 })
             }),
         ))
+        .parse_next(input)
+}
+
+// Binary message chain, e.g. `a + b - c`. A lone `=` is assignment; every other
+// selector (including `==`) is sent as an ordinary binary message.
+fn p_binary_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    (
+        p_operand,
+        repeat(0.., (p_binary_selector, p_operand)).fold(
+            || Vec::new(),
+            |mut messages: Vec<(String, Expr)>, message| {
+                messages.push(message);
+                messages
+            },
+        ),
+    )
+        .map(|(first, messages)| {
+            messages.into_iter().fold(first, |target, (selector, rhs)| {
+                if selector == "=" {
+                    Expr::Assign {
+                        target: Box::new(target),
+                        value: Box::new(rhs),
+                    }
+                } else {
+                    Expr::SelectorCall {
+                        target: Box::new(target),
+                        arity: CallArity::Binary,
+                        selector: selector.clone(),
+                        args: vec![(selector, rhs)],
+                    }
+                }
+            })
+        })
         .parse_next(input)
 }
 
@@ -557,6 +507,7 @@ pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
                     .map(|(name, _)| format!("{name}:"))
                     .collect::<String>();
                 Expr::SelectorCall {
+                    arity: CallArity::Keyword,
                     target: Box::new(receiver),
                     selector,
                     args: parts,
@@ -589,6 +540,7 @@ mod tests {
         Expr::SelectorCall {
             target: Box::new(target),
             selector: selector.to_string(),
+            arity: CallArity::Keyword,
             args: args
                 .into_iter()
                 .map(|(name, value)| (name.to_string(), value))
@@ -668,44 +620,32 @@ mod tests {
 
     #[test]
     fn arithmetic_respects_precedence() {
+        // Smalltalk binary messages have equal precedence and associate left-to-right,
+        // so `1 + 2 * 3` is `(1 + 2) * 3`, not `1 + (2 * 3)`.
         assert_eq!(
             parse("1 + 2 * 3"),
-            Expr::Binary {
-                op: BinaryOp::Add,
-                lhs: Box::new(int(1)),
-                rhs: Box::new(Expr::Binary {
-                    op: BinaryOp::Mul,
-                    lhs: Box::new(int(2)),
-                    rhs: Box::new(int(3)),
-                }),
-            }
+            selector_call(
+                selector_call(int(1), "+", vec![("+", int(2))]),
+                "*",
+                vec![("*", int(3))]
+            )
         );
         assert_eq!(
             parse("x - 1"),
-            Expr::Binary {
-                op: BinaryOp::Sub,
-                lhs: Box::new(ident("x")),
-                rhs: Box::new(int(1)),
-            }
+            selector_call(ident("x"), "-", vec![("-", int(1))])
         );
     }
 
     #[test]
     fn comparisons_and_assignment_parse() {
-        assert!(matches!(
+        assert_eq!(
             parse("x == 1"),
-            Expr::Binary {
-                op: BinaryOp::Eq,
-                ..
-            }
-        ));
-        assert!(matches!(
+            selector_call(ident("x"), "==", vec![("==", int(1))])
+        );
+        assert_eq!(
             parse("x != 1"),
-            Expr::Binary {
-                op: BinaryOp::Ne,
-                ..
-            }
-        ));
+            selector_call(ident("x"), "!=", vec![("!=", int(1))])
+        );
         assert!(matches!(parse("x = 1"), Expr::Assign { .. }));
     }
 

@@ -45,20 +45,10 @@ impl LowerCtx {
             ast::Expr::Lit(lit) => ObjCExpr::Lit(lit),
             ast::Expr::Ident(name) => ObjCExpr::Ident(name),
 
-            ast::Expr::Binary { op, lhs, rhs } => ObjCExpr::Binary {
-                op,
-                lhs: Box::new(self.lower_expr(*lhs)),
-                rhs: Box::new(self.lower_expr(*rhs)),
-            },
-
-            ast::Expr::Unary { op, expr } => ObjCExpr::Unary {
-                op,
-                expr: Box::new(self.lower_expr(*expr)),
-            },
-
             ast::Expr::SelectorCall {
                 target,
                 selector,
+                arity,
                 args,
             } => ObjCExpr::SelectorCall {
                 target: Box::new(self.lower_expr(*target)),

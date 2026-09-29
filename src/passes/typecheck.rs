@@ -101,18 +101,6 @@ impl TypeChecker {
                 let ty = Type::Tuple(typed.iter().map(|element| element.ty.clone()).collect());
                 Ok(TypedExpr::new(TypedExprKind::Tuple(typed), ty))
             }
-            Expr::Binary { op, lhs, rhs } => self.infer_binary(op.clone(), lhs, rhs),
-            Expr::Unary { op, expr } => {
-                let typed_expr = self.infer_expr(expr)?;
-                let ty = infer_unary_type(op.clone(), &typed_expr.ty)?;
-                Ok(TypedExpr::new(
-                    TypedExprKind::Unary {
-                        op: op.clone(),
-                        expr: Box::new(typed_expr),
-                    },
-                    ty,
-                ))
-            }
             Expr::Lambda { .. } => Err(TypeError::Unsupported(
                 "lambda inference requires an expected function type",
             )),

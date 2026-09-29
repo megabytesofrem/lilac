@@ -22,23 +22,19 @@ pub enum Visibility {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum CallArity {
+    Unary,
+    Binary,
+    Keyword,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Lit(Literal),
     Ident(String),
 
     Array(Vec<Expr>),
     Tuple(Vec<Expr>),
-
-    Binary {
-        op: BinaryOp,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    },
-
-    Unary {
-        op: UnaryOp,
-        expr: Box<Expr>,
-    },
 
     Lambda {
         parameter: String,
@@ -52,6 +48,7 @@ pub enum Expr {
     // keyword (`target kw1: a kw2: b`), optionally disambiguated with [ ... ]
     SelectorCall {
         target: Box<Expr>,
+        arity: CallArity,
         selector: String,
         args: Vec<(String, Expr)>,
     },
