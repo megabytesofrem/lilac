@@ -5,7 +5,7 @@ use winnow::token::{any, one_of, take_while};
 use winnow::{
     ascii::multispace1,
     combinator::{
-        Infix, Postfix, alt, delimited, dispatch, expression, fail, opt, preceded, repeat,
+        Infix, Postfix, alt, delimited, dispatch, expression, fail, not, opt, preceded, repeat,
         separated, terminated,
     },
 };
@@ -244,20 +244,21 @@ pub fn p_member_expr<'s>(input: &mut &'s str) -> Result<Expr> {
         .parse_next(input)
 }
 
-fn p_application_primary<'s>(input: &mut &'s str) -> Result<Expr> {
+fn p_primary<'s>(input: &mut &'s str) -> Result<Expr> {
     alt((
         // Keyword forms must come before identifiers
         p_do_block,
         p_let_expr,
         p_for_expr,
         p_until_expr,
-        p_selector_call,
         p_lambda_expr,
         p_literal.map(Expr::Lit),
         p_identifier.map(Expr::Ident),
         p_array_expr,
         p_tuple_expr,
         delimited(symbol("("), p_expr, symbol(")")),
+        // [ ... ] disambiguates a full expression, most commonly a nested message send
+        delimited(symbol("["), p_expr, symbol("]")),
     ))
     .parse_next(input)
 }
@@ -275,51 +276,43 @@ fn p_lambda_expr<'s>(input: &mut &'s str) -> Result<Expr> {
         .parse_next(input)
 }
 
-pub fn p_application_expr<'s>(input: &mut &'s str) -> Result<Expr> {
-    // ML style function application: f x y z
-    // Every primary is a lexeme, so arguments separated by whitespace are already adjacent here.
-    (
-        p_application_primary,
-        repeat(0.., p_application_primary).fold(
-            || Vec::new(),
-            |mut arguments: Vec<Expr>, argument| {
-                arguments.push(argument);
-                arguments
-            },
-        ),
-    )
-        .map(|(callee, arguments)| {
-            arguments
-                .into_iter()
-                .fold(callee, |callee, argument| Expr::Call {
-                    callee: Box::new(callee),
-                    arguments: vec![argument],
-                })
-        })
+// A single `keyword: argument` part of a keyword message. The argument is a binary
+// expression (no keyword messages), so nested keyword sends need [ ... ] to disambiguate.
+fn p_keyword_part<'s>(input: &mut &'s str) -> Result<(String, Expr)> {
+    (p_identifier, symbol(":"), p_binary_expr)
+        .map(|(name, _, value)| (name, value))
         .parse_next(input)
 }
 
-pub fn p_selector_call<'s>(input: &mut &'s str) -> Result<Expr> {
-    fn parse_keyword_argument<'s>(input: &mut &'s str) -> Result<(String, Expr)> {
-        lexeme((p_identifier, symbol(":"), p_expr))
-            .map(|(name, _, value)| (name, value))
-            .parse_next(input)
-    }
+// A unary selector is a bare identifier not immediately followed by ':' (which
+// would make it the start of a keyword part instead).
+fn p_unary_selector<'s>(input: &mut &'s str) -> Result<String> {
+    terminated(p_identifier, not(symbol(":"))).parse_next(input)
+}
 
-    // Objective-C style selector call: [target selector-name arg1:val1 arg2:val2 ...]
-    lexeme((
-        symbol("["),
-        p_application_primary, // target expression
-        p_identifier,          // selector name
-        separated(0.., parse_keyword_argument, symbol(" ")),
-        symbol("]"),
-    ))
-    .map(|(_, target, selector, args, _)| Expr::SelectorCall {
-        target: Box::new(target),
-        selector,
-        args,
-    })
-    .parse_next(input)
+// Smalltalk-style unary message chain: `receiver msg1 msg2 msg3`, left-associative.
+// This is what ML-style function application (`f x y z`) has been replaced with.
+fn p_unary_chain<'s>(input: &mut &'s str) -> Result<Expr> {
+    (
+        p_primary,
+        repeat(0.., p_unary_selector).fold(
+            || Vec::new(),
+            |mut selectors: Vec<String>, selector| {
+                selectors.push(selector);
+                selectors
+            },
+        ),
+    )
+        .map(|(receiver, selectors)| {
+            selectors
+                .into_iter()
+                .fold(receiver, |target, selector| Expr::SelectorCall {
+                    target: Box::new(target),
+                    selector,
+                    args: Vec::new(),
+                })
+        })
+        .parse_next(input)
 }
 
 pub fn p_block<'s>(input: &mut &'s str) -> Result<Expr> {
@@ -419,9 +412,10 @@ pub fn p_do_block<'s>(input: &mut &'s str) -> Result<Expr> {
     .parse_next(input)
 }
 
-// Main expression parser
-pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
-    expression(p_application_expr)
+// Binary/comparison/assignment layer, with `with` postfix. The base operand is a
+// unary message chain (Smalltalk unary sends bind tighter than binary operators).
+fn p_binary_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    expression(p_unary_chain)
         .infix(preceded(
             skip_ws,
             terminated(
@@ -540,6 +534,38 @@ pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
         .parse_next(input)
 }
 
+// Top-level expression parser: a keyword message send, e.g. `receiver kw1: a kw2: b`.
+// Keyword messages bind the loosest, and their arguments are binary expressions, so a
+// nested keyword send as an argument needs [ ... ] to disambiguate where it ends.
+pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    (
+        p_binary_expr,
+        repeat(0.., p_keyword_part).fold(
+            || Vec::new(),
+            |mut parts: Vec<(String, Expr)>, part| {
+                parts.push(part);
+                parts
+            },
+        ),
+    )
+        .map(|(receiver, parts)| {
+            if parts.is_empty() {
+                receiver
+            } else {
+                let selector = parts
+                    .iter()
+                    .map(|(name, _)| format!("{name}:"))
+                    .collect::<String>();
+                Expr::SelectorCall {
+                    target: Box::new(receiver),
+                    selector,
+                    args: parts,
+                }
+            }
+        })
+        .parse_next(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -557,13 +583,6 @@ mod tests {
 
     fn int(value: i64) -> Expr {
         Expr::Lit(Literal::Int(value))
-    }
-
-    fn call(callee: Expr, argument: Expr) -> Expr {
-        Expr::Call {
-            callee: Box::new(callee),
-            arguments: vec![argument],
-        }
     }
 
     fn selector_call(target: Expr, selector: &str, args: Vec<(&str, Expr)>) -> Expr {
@@ -595,19 +614,55 @@ mod tests {
     }
 
     #[test]
-    fn application_is_left_associative() {
+    fn unary_message_chain_is_left_associative() {
         assert_eq!(
-            parse("f x y"),
-            call(call(ident("f"), ident("x")), ident("y"))
+            parse("window contentView frame"),
+            selector_call(
+                selector_call(ident("window"), "contentView", vec![]),
+                "frame",
+                vec![]
+            )
         );
         assert_eq!(parse("this-as-ident"), ident("this-as-ident"));
     }
 
     #[test]
-    fn selector_call_parse() {
+    fn unbracketed_keyword_message_send() {
+        // window contentView addSubviews: [button withLabel: "Click"]
         assert_eq!(
-            parse("[obj do-something arg1:val1]"),
-            selector_call(ident("obj"), "do-something", vec![("arg1", ident("val1"))])
+            parse(r#"window contentView addSubviews: [button withLabel: "Click"]"#),
+            selector_call(
+                selector_call(ident("window"), "contentView", vec![]),
+                "addSubviews:",
+                vec![(
+                    "addSubviews",
+                    selector_call(
+                        ident("button"),
+                        "withLabel:",
+                        vec![("withLabel", Expr::Lit(Literal::Str("Click".into())))]
+                    )
+                )]
+            )
+        );
+    }
+
+    #[test]
+    fn bracketed_keyword_message_send_disambiguates() {
+        // [[window contentView] addSubviews:[button withLabel:"Click"]]
+        assert_eq!(
+            parse(r#"[[window contentView] addSubviews:[button withLabel:"Click"]]"#),
+            selector_call(
+                selector_call(ident("window"), "contentView", vec![]),
+                "addSubviews:",
+                vec![(
+                    "addSubviews",
+                    selector_call(
+                        ident("button"),
+                        "withLabel:",
+                        vec![("withLabel", Expr::Lit(Literal::Str("Click".into())))]
+                    )
+                )]
+            )
         );
     }
 
@@ -671,9 +726,9 @@ mod tests {
     #[test]
     fn do_block_parse() {
         let source = r#"do
-    let x: Maybe i32 <- [Just value: 5];
-    let y: Maybe i32 <- [Just value: 6];
-    let z: Maybe i32 <- [Just [x apply: |c| c + 1]];
+    let x: i32 <- [Just value: 5];
+    let y: i32 <- [Just value: 6];
+    let z: i32 <- [Just value: [x apply: |c| c + 1]];
     [Console show: [z describe]];
 end"#;
 

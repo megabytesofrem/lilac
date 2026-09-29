@@ -48,13 +48,8 @@ pub enum Expr {
     // Member access expression: object.member
     Member(Box<Expr>, String),
 
-    // ML style function application: f x y z
-    Call {
-        callee: Box<Expr>,
-        arguments: Vec<Expr>,
-    },
-
-    // Objective-C style selector call: [target selector-name arg1:val]
+    // Objective-C/Smalltalk style message send: unary (`target selector`) or
+    // keyword (`target kw1: a kw2: b`), optionally disambiguated with [ ... ]
     SelectorCall {
         target: Box<Expr>,
         selector: String,

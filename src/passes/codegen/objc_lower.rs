@@ -56,14 +56,6 @@ impl LowerCtx {
                 expr: Box::new(self.lower_expr(*expr)),
             },
 
-            ast::Expr::Call { callee, arguments } => ObjCExpr::CCall {
-                callee: Box::new(self.lower_expr(*callee)),
-                arguments: arguments
-                    .into_iter()
-                    .map(|arg| self.lower_expr(arg))
-                    .collect(),
-            },
-
             ast::Expr::SelectorCall {
                 target,
                 selector,

@@ -31,7 +31,6 @@ pub enum TypeError {
         lhs: Type,
         rhs: Type,
     },
-    NotCallable(Type),
     CannotInferEmptyCollection,
     Unsupported(&'static str),
 }
@@ -117,7 +116,6 @@ impl TypeChecker {
             Expr::Lambda { .. } => Err(TypeError::Unsupported(
                 "lambda inference requires an expected function type",
             )),
-            Expr::Call { callee, arguments } => self.infer_call(callee, arguments),
             Expr::Let {
                 name,
                 opt_type,
@@ -470,42 +468,6 @@ impl TypeChecker {
                 rhs: Box::new(typed_rhs),
             },
             result_type,
-        ))
-    }
-
-    fn infer_call(&mut self, callee: &Expr, arguments: &[Expr]) -> TypeResult<TypedExpr> {
-        let typed_callee = self.infer_expr(callee)?;
-
-        // Not a callable type: the callee must be a function
-        let Type::Function {
-            parameters,
-            return_type,
-        } = typed_callee.ty.clone()
-        else {
-            return Err(TypeError::NotCallable(typed_callee.ty));
-        };
-
-        // Arity mismatch: argument count does not match
-        if parameters.len() != arguments.len() {
-            return Err(TypeError::ArityMismatch {
-                expected: parameters.len(),
-                actual: arguments.len(),
-            });
-        }
-
-        // Type check each argument against the corresponding parameter type.
-        let typed_arguments = arguments
-            .iter()
-            .zip(&parameters)
-            .map(|(argument, parameter)| self.check_expr(argument, parameter))
-            .collect::<TypeResult<Vec<_>>>()?;
-
-        Ok(TypedExpr::new(
-            TypedExprKind::Call {
-                callee: Box::new(typed_callee),
-                arguments: typed_arguments,
-            },
-            *return_type,
         ))
     }
 }

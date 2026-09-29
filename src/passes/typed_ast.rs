@@ -43,11 +43,6 @@ pub enum TypedExprKind {
         member: String,
     },
 
-    Call {
-        callee: Box<TypedExpr>,
-        arguments: Vec<TypedExpr>,
-    },
-
     SelectorCall {
         target: Box<TypedExpr>,
         selector: String,
