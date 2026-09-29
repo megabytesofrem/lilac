@@ -30,7 +30,11 @@ lilac_msgsend:
     testq %rdi, %rdi
     jz .L_msgsend_nil
 
-    /* Load class pointer from LilacHeader (offset -16 bytes) */
+    /* Tag check: check if receiver (%rdi) is a tagged immediate value */
+    testq $0x07, %rdi
+    jnz .L_path_tagged
+
+    /* Fast path: load the class pointer from the object header */
     movq CLASS_OFFSET(%rdi), %r10        /* %r10 = LilacClass pointer */
 
     /* Load cache mask & cache base array (offset +8 and +16 bytes respectively) */
@@ -62,9 +66,12 @@ lilac_msgsend:
 
     /* cache hit: jump to the method in %r8, bypassing prologue/epilogue */
     jmp *%r8
+.L_path_tagged:
+    /* Handle tagged immediate values separately in C */
+    jmp lilac_msgsend_tagged_slow
 .L_path_miss:
-    /* Handle cache miss: call lilac_msgsend_slow_path or similar logic */
-    jmp lilac_msgsend_slow_path
+    /* Handle cache miss: call lilac_msgsend_slow */
+    jmp lilac_msgsend_slow
 .L_msgsend_nil:
     xorq %rax, %rax  /* return nil (null pointer) */ 
     xorq %rdx, %rdx  /* clear %rdx as well */
@@ -90,7 +97,11 @@ lilac_msgsend_fpret:
     testq %rdi, %rdi
     jz .L_fpret_nil
 
-    /* Load class pointer from LilacHeader (offset -16 bytes) */
+    /* Tag check: check if receiver (%rdi) is a tagged immediate value */
+    testq $0x07, %rdi
+    jnz .L_fpret_path_tagged
+
+    /* Fast path: load the class pointer from the object header */
     movq CLASS_OFFSET(%rdi), %r10       /* %r10 = LilacClass pointer */
 
     /* Load cache mask & cache base array */
@@ -124,8 +135,11 @@ lilac_msgsend_fpret:
 
     /* cache hit: jump to the method in %r8, bypassing prologue/epilogue */
     jmp *%r8                            /* jump to the cached method pointer */
+.L_fpret_path_tagged:
+    jmp lilac_msgsend_tagged_fpret_slow
 .L_fpret_miss:
-    jmp lilac_msgsend_fpret_slow_path
+    /* Handle cache miss: call lilac_msgsend_fpret_slow */
+    jmp lilac_msgsend_fpret_slow
 .L_fpret_nil:
     /* clear return registers from nil floating-point returns */
     xorq %rax, %rax                     /* clear integer return register */

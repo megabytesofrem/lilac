@@ -1,5 +1,10 @@
 ## A few notes
 
+### Smalltalk Semantics
+- Everything is an object
+- Objects can send/recieve messages
+- Functions defined using `def` are defined on `World` 
+
 ### Functional Core, Imperative Shell
 
 Functional core, imperative shell. A majority of the code-base *should* be purely functional and Lilac

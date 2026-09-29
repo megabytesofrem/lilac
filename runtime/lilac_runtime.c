@@ -3,6 +3,55 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
+LilacWord lilac_encode_i8(int8_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_I8;
+}
+
+LilacWord lilac_encode_i16(int16_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_I16;
+}
+
+LilacWord lilac_encode_i32(int32_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_I32;
+}
+
+LilacWord lilac_encode_u8(uint8_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_U8;
+}
+
+LilacWord lilac_encode_u16(uint16_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_U16;
+}
+
+LilacWord lilac_encode_u32(uint32_t value) {
+    return ((LilacWord)value << 3) | LILAC_TAG_INT | SUBTAG_U32;
+}
+
+int8_t lilac_decode_i8(LilacWord value) { return (int8_t)(value >> 3); }
+
+int16_t lilac_decode_i16(LilacWord value) { return (int16_t)(value >> 3); }
+
+int32_t lilac_decode_i32(LilacWord value) { return (int32_t)(value >> 3); }
+
+uint8_t lilac_decode_u8(LilacWord value) { return (uint8_t)(value >> 3); }
+
+uint16_t lilac_decode_u16(LilacWord value) { return (uint16_t)(value >> 3); }
+
+uint32_t lilac_decode_u32(LilacWord value) { return (uint32_t)(value >> 3); }
+
+bool lilac_is_small_int(LilacWord value) {
+    /* SmallIntegers are represented with the INT tag and a subtag of between I8
+     * and I58 */
+    return (value & LILAC_TAG_MASK) == LILAC_TAG_INT &&
+           (value & SUBTAG_MASK) >= SUBTAG_I8 &&
+           (value & SUBTAG_MASK) <= SUBTAG_I58;
+}
+
+bool lilac_is_large_int(LilacWord value) {
+    /* LargeIntegers are handled as pointers (LILAC_TAG_PTR) */
+    return (value & LILAC_TAG_MASK) == LILAC_TAG_PTR;
+}
+
 const char* lilac_sel_registername(const char* name) {
     // TODO: Implement selector registration logic here.
     return name;
