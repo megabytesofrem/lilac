@@ -108,7 +108,7 @@ pub struct DoBlock {
 pub enum Item {
     Expr(Expr),
 
-    StructDef {
+    ClassDef {
         name: String,
         fields: Vec<(String, types::Type)>,
     },

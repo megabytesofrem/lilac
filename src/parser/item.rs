@@ -4,6 +4,7 @@ use winnow::combinator::alt;
 use winnow::combinator::{opt, preceded, repeat, terminated};
 
 use crate::ast::Item;
+use crate::ast::Visibility;
 use crate::ast::message;
 use crate::ast::types;
 use crate::parser::expression::{p_expr, p_identifier};
@@ -12,7 +13,7 @@ use crate::parser::params;
 use super::{keyword, lexeme, p_type, symbol};
 
 #[rustfmt::skip]
-pub fn struct_field<'s>(input: &mut &'s str) -> Result<(String, types::Type)> {
+pub fn class_field<'s>(input: &mut &'s str) -> Result<(String, types::Type)> {
     lexeme((
         p_identifier,
         symbol(":"),
@@ -27,21 +28,45 @@ pub fn enum_variant<'s>(input: &mut &'s str) -> Result<String> {
     lexeme(p_identifier).parse_next(input)
 }
 
+pub fn p_function_def<'s>(input: &mut &'s str) -> Result<Item> {
+    // Function definition
+    // def <name> (<params>) -> <return_type> = <body>
+
+    lexeme((
+        keyword("def"),
+        p_identifier,
+        params,
+        opt(preceded(symbol("->"), p_type)),
+        symbol("="),
+        p_expr,
+    ))
+    .map(
+        |(_, name, params, return_type, _, body)| Item::FunctionDef {
+            name,
+            params,
+            visibility: Visibility::Public, // Adjust as needed
+            return_type: return_type.unwrap_or(types::Type::Unit),
+            body,
+        },
+    )
+    .parse_next(input)
+}
+
 #[rustfmt::skip]
-pub fn p_struct_def<'s>(input: &mut &'s str) -> Result<Item> {
-    // Struct definition
-    // struct <name>
+pub fn p_class_def<'s>(input: &mut &'s str) -> Result<Item> {
+    // Class definition
+    // class <name>
     //     <field_name>: <field_type>,
     //     ...
     // end
 
     lexeme((
-        keyword("struct"),
+        keyword("class"),
         p_identifier,
-        repeat(0.., terminated(struct_field, opt(symbol(",")))),
+        repeat(0.., terminated(class_field, opt(symbol(",")))),
         keyword("end"),
     ))
-    .map(|(_, name, fields, _)| Item::StructDef { name, fields })
+    .map(|(_, name, fields, _)| Item::ClassDef { name, fields })
     .parse_next(input)
 }
 
@@ -69,8 +94,8 @@ fn p_message_signature<'s>(input: &mut &'s str) -> Result<message::Message> {
     // Message signature definition
     // message <selector> (<params>)
 
-    (keyword("message"), p_identifier, params)
-        .map(|(_, selector, args)| message::Message {
+    (p_identifier, params)
+        .map(|(selector, args)| message::Message {
             selector: message::Selector(selector),
             target: args
                 .first()
@@ -86,8 +111,13 @@ fn p_message<'s>(input: &mut &'s str) -> Result<message::Message> {
     // Message signature definition
     // message <selector> (<params>) -> <return_type>
 
-    (p_message_signature, symbol("->"), p_type)
-        .map(|(message, _, ty)| message::Message {
+    (
+        keyword("message"),
+        p_message_signature,
+        symbol("->"),
+        p_type,
+    )
+        .map(|(_, message, _, ty)| message::Message {
             return_type: Some(ty),
             ..message
         })
@@ -99,13 +129,14 @@ pub fn p_message_handler<'s>(input: &mut &'s str) -> Result<message::MessageHand
     // message <selector> (<params>) = <handler_body>
 
     (
+        keyword("message"),
         p_message_signature,
         opt(preceded(symbol("->"), p_type)),
         symbol("="),
         p_expr,
     )
         .map(
-            |(message, return_type, _, handler_body)| message::MessageHandler {
+            |(_, message, return_type, _, handler_body)| message::MessageHandler {
                 message: message::Message {
                     return_type,
                     ..message
@@ -158,23 +189,30 @@ pub fn p_implementation<'s>(input: &mut &'s str) -> Result<Item> {
     .parse_next(input)
 }
 
-#[rustfmt::skip]
 pub fn p_item<'s>(input: &mut &'s str) -> Result<Item> {
     // Item can be an enum, protocol, or protocol implementation
 
     alt((
-        p_struct_def,       // Struct definition
-        p_enum_def,         // Enum definition
-        p_protocol_def,     // Protocol definition
-        p_implementation,   // Protocol implementation
+        p_function_def,   // Function definition
+        p_class_def,      // Class definition
+        p_enum_def,       // Enum definition
+        p_protocol_def,   // Protocol definition
+        p_implementation, // Protocol implementation
     ))
     .parse_next(input)
 }
 
 mod tests {
     #[test]
-    fn struct_def() {
-        let mut input = "struct MyStruct
+    fn function_def() {
+        let mut input = "def greet who: string inLanguage: string -> bool = greetBody";
+        let result = super::p_item(&mut input);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn class_def() {
+        let mut input = "class MyClass
             field1: i32
         end";
         let result = super::p_item(&mut input);

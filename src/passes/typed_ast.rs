@@ -123,7 +123,7 @@ pub struct TypedMessageHandler {
 pub enum TypedItem {
     Expr(TypedExpr),
 
-    StructDef {
+    ClassDef {
         name: String,
         fields: Vec<TypedField>,
     },

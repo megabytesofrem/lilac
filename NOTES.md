@@ -11,7 +11,7 @@ Functional core, imperative shell. A majority of the code-base *should* be purel
 employs the existence of concepts from category theory (and Haskell) such as functors, applicatives, monads - minus monad transformers: they stack *naturally* via `protocol`s.
 
 ```
-struct Ctx
+class Ctx
   config: Config
   db: DBConnection
 end
@@ -25,7 +25,7 @@ implement State DBConnection on Ctx
   ...
 end
 
-def main () -> IO () = do
+def World main -> IO () = do
   let ctx  = Ctx { config: .., db: [DBConnection open-connection-on:4444] } in
   let cfg  = [ctx ask].config in
   let db   = [ctx ask].db in

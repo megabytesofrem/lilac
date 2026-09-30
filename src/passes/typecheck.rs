@@ -230,7 +230,7 @@ impl TypeChecker {
     pub fn check_item(&mut self, item: &Item) -> TypeResult<TypedItem> {
         match item {
             Item::Expr(expr) => Ok(TypedItem::Expr(self.infer_expr(expr)?)),
-            Item::StructDef { name, fields } => Ok(TypedItem::StructDef {
+            Item::ClassDef { name, fields } => Ok(TypedItem::ClassDef {
                 name: name.clone(),
                 fields: fields
                     .iter()

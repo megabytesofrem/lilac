@@ -5,7 +5,7 @@ use winnow::Parser;
 use winnow::Result;
 use winnow::ascii::{multispace0, multispace1};
 use winnow::combinator::delimited;
-use winnow::combinator::{alt, not, opt, separated, terminated};
+use winnow::combinator::{alt, not, opt, repeat, separated, terminated};
 use winnow::error::ContextError;
 use winnow::token::{literal, one_of, take_while};
 
@@ -51,24 +51,19 @@ pub fn keyword<'s>(value: &'static str) -> impl Parser<&'s str, &'s str, Context
 
 #[rustfmt::skip]
 pub fn params<'s>(input: &mut &'s str) -> Result<Vec<(String, types::Type)>> {
-    #[rustfmt::skip]
     fn param<'s>(input: &mut &'s str) -> Result<(String, types::Type)> {
         lexeme((
+            opt(symbol("(")),
             expression::p_identifier,
             symbol(":"),
-            p_type
+            p_type,
+            opt(symbol(")")),
         ))
-        .map(|(name, _, ty)| (name, ty))
+        .map(|(_, name, _, ty, _)| (name, ty))
         .parse_next(input)
     }
 
-    // TODO: change this to use an actual param parser instead of struct_field
-    delimited(
-        symbol("("),
-        separated(0.., param, symbol(",")), 
-        symbol(")")
-    )
-    .parse_next(input)
+    repeat(0.., param).parse_next(input)
 }
 
 fn p_named_type<'s>(input: &mut &'s str) -> Result<types::Type> {
@@ -101,6 +96,7 @@ pub fn p_type<'s>(input: &mut &'s str) -> Result<types::Type> {
         symbol("f64").map(|_| types::Type::F64),
         symbol("bool").map(|_| types::Type::Bool),
         symbol("char").map(|_| types::Type::Char),
+        keyword("string").map(|_| types::Type::Str),
         symbol("str").map(|_| types::Type::Str),
         symbol("unit").map(|_| types::Type::Unit),
         // User-defined types

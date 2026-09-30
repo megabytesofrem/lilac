@@ -81,8 +81,8 @@ pub fn p_string_literal<'s>(input: &mut &'s str) -> Result<Literal> {
 }
 
 pub fn p_char_literal<'s>(input: &mut &'s str) -> Result<Literal> {
-    // Character literal enclosed in double single quotes: ''a''
-    lexeme(delimited("''", any, "''"))
+    // Character literal: $A
+    lexeme(preceded('$', any))
         .map(Literal::Char)
         .parse_next(input)
 }
@@ -501,10 +501,20 @@ mod tests {
     }
 
     fn selector_call(target: Expr, selector: &str, args: Vec<(&str, Expr)>) -> Expr {
+        let arity = if args.is_empty() {
+            CallArity::Unary
+        } else {
+            if selector.ends_with(':') {
+                CallArity::Keyword
+            } else {
+                CallArity::Binary
+            }
+        };
+
         Expr::SelectorCall {
             target: Box::new(target),
             selector: selector.to_string(),
-            arity: CallArity::Keyword,
+            arity,
             args: args
                 .into_iter()
                 .map(|(name, value)| (name.to_string(), value))
@@ -517,7 +527,7 @@ mod tests {
         assert_eq!(parse("42"), int(42));
         assert_eq!(parse("1.5"), Expr::Lit(Literal::Float(1.5)));
         assert_eq!(parse("\"hello\""), Expr::Lit(Literal::Str("hello".into())));
-        assert_eq!(parse("''a''"), Expr::Lit(Literal::Char('a')));
+        assert_eq!(parse("$A"), Expr::Lit(Literal::Char('A')));
         assert_eq!(parse("true"), Expr::Lit(Literal::Bool(true)));
     }
 
