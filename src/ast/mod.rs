@@ -105,12 +105,26 @@ pub struct DoBlock {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ClassMethod {
+    pub name: String,
+    pub params: Vec<(String, types::Type)>,
+    pub visibility: Visibility,
+    pub return_type: types::Type,
+    pub body: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Expr(Expr),
 
     ClassDef {
         name: String,
+        superclass: Option<String>,
+        conforms: Vec<String>,
         fields: Vec<(String, types::Type)>,
+
+        methods: Vec<ClassMethod>,
+        override_methods: Vec<ClassMethod>,
     },
 
     EnumDef {

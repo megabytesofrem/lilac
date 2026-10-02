@@ -125,7 +125,11 @@ pub enum TypedItem {
 
     ClassDef {
         name: String,
+        superclass: Option<String>,
+        conforms: Vec<String>,
         fields: Vec<TypedField>,
+        methods: Vec<TypedMessageHandler>,
+        override_methods: Vec<TypedMessageHandler>,
     },
 
     EnumDef {

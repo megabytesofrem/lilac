@@ -81,6 +81,29 @@ fn p_named_type<'s>(input: &mut &'s str) -> Result<types::Type> {
     .parse_next(input)
 }
 
+fn p_named_type_application<'s>(input: &mut &'s str) -> Result<types::Type> {
+    // Named type application: a named type followed by zero or more type arguments.
+    // Example: `Result i32` would be parsed as a named type application with `Result` as the first type and `i32` as the argument.
+
+    (p_named_type, repeat(0.., p_named_type))
+        .map(|(first, arguments): (types::Type, Vec<types::Type>)| {
+            let mut names = vec![first];
+            names.extend(arguments);
+
+            types::Type::Named(
+                names
+                    .into_iter()
+                    .map(|ty| match ty {
+                        types::Type::Named(name) => name,
+                        _ => unreachable!(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
+        })
+        .parse_next(input)
+}
+
 // Type parser
 pub fn p_type<'s>(input: &mut &'s str) -> Result<types::Type> {
     alt((
@@ -100,7 +123,7 @@ pub fn p_type<'s>(input: &mut &'s str) -> Result<types::Type> {
         symbol("str").map(|_| types::Type::Str),
         symbol("unit").map(|_| types::Type::Unit),
         // User-defined types
-        p_named_type,
+        p_named_type_application,
         // Array type
         lexeme((symbol("#["), p_type, symbol("]")))
             .map(|(_, ty, _)| types::Type::Array(Box::new(ty))),

@@ -230,8 +230,17 @@ impl TypeChecker {
     pub fn check_item(&mut self, item: &Item) -> TypeResult<TypedItem> {
         match item {
             Item::Expr(expr) => Ok(TypedItem::Expr(self.infer_expr(expr)?)),
-            Item::ClassDef { name, fields } => Ok(TypedItem::ClassDef {
+            Item::ClassDef {
+                name,
+                superclass,
+                conforms,
+                fields,
+                methods,
+                override_methods,
+            } => Ok(TypedItem::ClassDef {
                 name: name.clone(),
+                superclass: superclass.clone(),
+                conforms: conforms.clone(),
                 fields: fields
                     .iter()
                     .map(|(name, ty)| TypedField {
@@ -239,6 +248,9 @@ impl TypeChecker {
                         ty: ty.clone(),
                     })
                     .collect(),
+                // TODO: handle typechecking for methods and override_methods
+                methods: Vec::new(),
+                override_methods: Vec::new(),
             }),
             Item::EnumDef { name, variants } => Ok(TypedItem::EnumDef {
                 name: name.clone(),

@@ -164,6 +164,26 @@ pub fn p_tuple_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     .parse_next(input)
 }
 
+pub fn p_record_expr<'s>(input: &mut &'s str) -> Result<Expr> {
+    (
+        p_identifier,
+        delimited(
+            symbol("{"),
+            separated(
+                0..,
+                (p_identifier, symbol(":"), p_expr).map(|(name, _, value)| (name, value)),
+                symbol(","),
+            ),
+            symbol("}"),
+        ),
+    )
+        .map(|(name, new_props)| Expr::With {
+            target: Box::new(Expr::Ident(name)),
+            new_props,
+        })
+        .parse_next(input)
+}
+
 pub fn p_if_expr<'s>(input: &mut &'s str) -> Result<Expr> {
     // If expression: if <condition> then <then_branch> [else <else_branch>]
     lexeme((
@@ -216,6 +236,7 @@ fn p_primary<'s>(input: &mut &'s str) -> Result<Expr> {
         p_let_expr,
         p_lambda_expr,
         p_literal.map(Expr::Lit),
+        p_record_expr,
         p_identifier.map(Expr::Ident),
         p_array_expr,
         p_tuple_expr,
@@ -317,42 +338,28 @@ pub fn p_do_block<'s>(input: &mut &'s str) -> Result<Expr> {
     // chains where each `let` binding introduces a new monadic bind.
 
     // do
-    //   let x <- [producer  produce];
-    //   let y <- [producer2 produce];
-    //   [Console show: [x add: y]]
+    //   let x <- [producer  produce].
+    //   let y <- [producer2 produce].
+    //   [Console show: [x add: y]].
     // end
 
     // Desugars to the form:
     //
     // [producer transform: |x|
     //   [producer2 transform: |y|
-    //      [Console show: [x add: y]]]
+    //      [Console show: [x add: y]]].
     //
     // NOTE: For obvious reasons, this is not very readable (infact it is less readable than Haskell),
     // so do-blocks should be used frequently to avoid having to write manual bind chains.
 
     lexeme((
         keyword("do"),
-        repeat(
-            0..,
-            terminated(
-                alt((
-                    p_let_binding_in_do.map(DoStatement::Binding),
-                    p_expr.map(DoStatement::Expression),
-                )),
-                symbol(";"),
-            ),
-        )
-        .fold(
-            || Vec::new(),
-            |mut statements, statement| {
-                statements.push(statement);
-                statements
-            },
-        ),
-        keyword("end"),
+        alt((
+            delimited(symbol("{"), p_do_statements, symbol("}")),
+            terminated(p_do_statements, keyword("end")),
+        )),
     ))
-    .map(|(_, statements, _)| {
+    .map(|(_, statements)| {
         let mut bindings = Vec::new();
         let mut exprs = Vec::new();
 
@@ -373,6 +380,20 @@ pub fn p_do_block<'s>(input: &mut &'s str) -> Result<Expr> {
             trailing_expr,
         }))
     })
+    .parse_next(input)
+}
+
+fn p_do_statements<'s>(input: &mut &'s str) -> Result<Vec<DoStatement>> {
+    repeat(
+        0..,
+        terminated(
+            alt((
+                p_let_binding_in_do.map(DoStatement::Binding),
+                p_expr.map(DoStatement::Expression),
+            )),
+            opt(symbol(";")),
+        ),
+    )
     .parse_next(input)
 }
 
@@ -461,8 +482,9 @@ pub fn p_expr<'s>(input: &mut &'s str) -> Result<Expr> {
                 parts
             },
         ),
+        opt(symbol(".")),
     )
-        .map(|(receiver, parts)| {
+        .map(|(receiver, parts, _)| {
             if parts.is_empty() {
                 receiver
             } else {
@@ -525,6 +547,7 @@ mod tests {
     #[test]
     fn literals_parse() {
         assert_eq!(parse("42"), int(42));
+        assert_eq!(parse("42."), int(42));
         assert_eq!(parse("1.5"), Expr::Lit(Literal::Float(1.5)));
         assert_eq!(parse("\"hello\""), Expr::Lit(Literal::Str("hello".into())));
         assert_eq!(parse("$A"), Expr::Lit(Literal::Char('A')));
@@ -638,16 +661,29 @@ mod tests {
     #[test]
     fn do_block_parse() {
         let source = r#"do
-    let x: i32 <- [Just value: 5];
-    let y: i32 <- [Just value: 6];
-    let z: i32 <- [Just value: [x apply: |c| c + 1]];
-    [Console show: [z describe]];
+    let x: i32 <- [Just value: 5].
+    let y: i32 <- [Just value: 6].
+    let z: i32 <- [Just value: [x apply: |c| c + 1]].
+    [Console show: [z describe]].
 end"#;
 
         assert!(matches!(parse(source), Expr::DoBlock(block)
             if block.bindings.len() == 3
                 && block.exprs.is_empty()
                 && block.trailing_expr.is_some()));
+    }
+
+    #[test]
+    fn period_terminates_do_block_expressions() {
+        let source = r#"do
+    first.
+    second.
+end"#;
+
+        assert!(matches!(parse(source), Expr::DoBlock(block)
+            if block.exprs.len() == 1
+                && matches!(block.exprs.first(), Some(Expr::Ident(name)) if name == "first")
+                && matches!(block.trailing_expr.as_ref(), Some(Expr::Ident(name)) if name == "second")));
     }
 
     #[test]

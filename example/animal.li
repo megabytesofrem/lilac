@@ -1,23 +1,18 @@
-protocol Dog
+protocol Dog {
   message bark (self) : String
-end
+}
 
-protocol Cow
+protocol Cow {
   message moo (self) : String
-end
+}
 
-class Clarus
-end
+class Clarus conforms (Dog, Cow) {
+  override bark self: Clarus -> String = "woof".
+  override moo self: Clarus -> String = "moo".
 
-implement (Dog, Cow) on Clarus
-  message bark (self) = "woof"
-  message moo (self) = "moo"
-end
-
-implement Clarus
-  def getAnimal (self) : String = "dogcow"
-  def moof (self) : String = self moo appended: [self bark atIndex: 3]
-end
+  def getAnimal self: Clarus -> String = "dogcow".
+  def moof self: Clarus -> String = self moo appended: [self bark atIndex: 3].
+}
 
 -- Use like
 [Clarus alloc] getAnimal

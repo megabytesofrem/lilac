@@ -7,18 +7,18 @@ let pi = 3.14.
 let array = #[1,2,3].
 let tuple = #(1,2,3).
 
-def System/greet who:String prefixedWith: String -> String =
-  prefixedWith, who.
-
 -- Classes
-class Dice
+class Dice conforms Object {
   sides: Int
   number: Int
-end
 
-def Dice/makeDice withSides: Int -> Dice = Dice { sides: withSides, number: 0 }
+  def makeDice withSides: Int -> Dice = 
+    Dice { sides: withSides, number: 0 }.
 
-def Dice/rollDice self:Dice -> IO Dice = do
-  let randNumber <- Random from: 0 to: sides.
-  IO pure value: Dice { sides: self sides, number: randNumber }.
-end
+  override describe self:Dice -> String = [sides toString], "sided die".
+}
+
+let sixSidedDie    = makeDice withSides: 6 in
+let twelveSidedDie = makeDice withSides: 12 in
+let result         = [sixSidedDie describe], " and ", [twelveSidedDie describe] in
+result.
