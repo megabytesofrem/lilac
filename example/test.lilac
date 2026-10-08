@@ -1,0 +1,23 @@
+class Item[A] {
+  field itemContents: A
+
+  def getContents (self) -> A { self.itemContents }
+}
+
+class Mailbox {
+  field storedItem: Item
+  field owner: String
+
+  def setStoredItemTo (self) ?item:(Item) -> Void {
+    self.storedItem = item
+  }
+
+  def putInMailbox (self) theItem:(Item) belongingTo:thePerson:(Person) -> Void {
+    if owner == thePerson {
+      self setStoredItemTo: theItem;
+    }
+    else {
+      Console show: "You are not the owner of that mailbox";
+    }
+  }
+}
