@@ -29,5 +29,8 @@ class ArgumentPair {
    public:
     ArgumentPair(K key, V value) : key(key), value(value) {}
 
+    const K& getKey() const { return key; }
+    const V& getValue() const { return value; }
+
     virtual ~ArgumentPair() = default;
 };

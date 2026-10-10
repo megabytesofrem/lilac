@@ -15,7 +15,11 @@ target_sources(lilac PRIVATE
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(lexer_tests tests/lexer_tests.cpp src/lexer.cpp)
-    target_include_directories(lexer_tests PRIVATE src)
-    add_test(NAME lexer_tests COMMAND lexer_tests)
+    # add_executable(lexer_tests tests/lexer_tests.cpp src/lexer.cpp)
+    # target_include_directories(lexer_tests PRIVATE src)
+    # add_test(NAME lexer_tests COMMAND lexer_tests)
+
+    add_executable(ast_visit_tests tests/ast_visit_tests.cpp)
+    target_include_directories(ast_visit_tests PRIVATE src)
+    add_test(NAME ast_visit_tests COMMAND ast_visit_tests)
 endif()

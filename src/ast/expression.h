@@ -1,25 +1,24 @@
 #pragma once
 
 #include <string_view>
+#include <variant>
 #include <vector>
 
 #include "ast_node.h"
-#include "literal_type.h"
 
 /**
  * Represents a literal expression in the AST.
  */
-template <typename T>
 class LiteralExpr : public Node {
+   public:
+    using Value = std::variant<int, double, std::string_view, char, bool>;
+
+    explicit LiteralExpr(Value value) : value(value) {}
+
+    const Value& getValue() const { return value; }
+
    private:
-    LiteralType type;
-    T value;
-
-   public:
-    LiteralExpr(LiteralType type, T value) : type(type), value(value) {}
-
-   public:
-    virtual ~LiteralExpr() = default;
+    Value value;
 };
 
 /**
@@ -31,6 +30,8 @@ class IdentifierExpr : public Node {
 
    public:
     IdentifierExpr(std::string_view name) : name(name) {}
+
+    std::string_view getName() const { return name; }
 
    public:
     virtual ~IdentifierExpr() = default;
@@ -45,6 +46,8 @@ class ArrayExpr : public Node {
 
    public:
     ArrayExpr(const std::vector<Node*>& elements) : elements(elements) {}
+
+    const std::vector<Node*>& getElements() const { return elements; }
 
    public:
     virtual ~ArrayExpr() = default;
@@ -61,6 +64,9 @@ class CallExpr : public Node {
    public:
     CallExpr(Node* callee, const std::vector<Node*>& arguments)
         : callee(callee), arguments(arguments) {}
+
+    Node* getCallee() const { return callee; }
+    const std::vector<Node*>& getArguments() const { return arguments; }
 
    public:
     virtual ~CallExpr() = default;
@@ -79,6 +85,10 @@ class LetExpr : public Node {
     LetExpr(std::string_view name, Node* value, Node* body)
         : name(name), value(value), body(body) {}
 
+    std::string_view getName() const { return name; }
+    Node* getValue() const { return value; }
+    Node* getBody() const { return body; }
+
    public:
     virtual ~LetExpr() = default;
 };
@@ -94,6 +104,22 @@ class AssignExpr : public Node {
    public:
     AssignExpr(std::string_view name, Node* value) : name(name), value(value) {}
 
+    std::string_view getName() const { return name; }
+    Node* getValue() const { return value; }
+
    public:
     virtual ~AssignExpr() = default;
+};
+
+class ExprItem : public Item {
+   private:
+    Node* expression;
+
+   public:
+    ExprItem(Node* expression) : expression(expression) {}
+
+    Node* getExpression() const { return expression; }
+
+   public:
+    virtual ~ExprItem() = default;
 };

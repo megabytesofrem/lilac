@@ -10,19 +10,6 @@
  */
 enum class CallArity { Unary, Binary, Keyword };
 
-struct Message {
-    std::string_view target;
-    std::string_view selector;
-    std::vector<ArgumentPair<std::string_view, Node*>> keyword_args;
-
-    Message(
-        std::string_view target, std::string_view selector,
-        const std::vector<ArgumentPair<std::string_view, Node*>>& keyword_args)
-        : target(target), selector(selector), keyword_args(keyword_args) {}
-
-    ~Message() = default;
-};
-
 /**
  * Represents a Smalltalk-style selector call in the AST.
  *
@@ -47,6 +34,14 @@ class SelectorCall : public Node {
           selector(selector),
           arguments(arguments),
           arity(arity) {}
+
+    Node* getTarget() const { return target; }
+    std::string_view getSelector() const { return selector; }
+    const std::vector<ArgumentPair<std::string_view, Node*>>& getArguments()
+        const {
+        return arguments;
+    }
+    CallArity getArity() const { return arity; }
 
    public:
     virtual ~SelectorCall() = default;

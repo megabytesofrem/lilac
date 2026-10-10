@@ -5,6 +5,10 @@ A modern programming language inspired by Objective-C. Lilac is Objective-C's bi
 ## Why another language?
 Lilac is designed to be a versatile and modern language for low-level systems programming, based on a micro-runtime (`lilac_msgsend`/`lilac_retain`).
 
+## Building
+The language can be built using CMake: `cmake --build build`, and the tests can be ran using `ctest --test-dir build`.
+
+
 ## Syntax
 
 ### Messages and Calls
