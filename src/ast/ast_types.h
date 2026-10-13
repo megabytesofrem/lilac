@@ -1,8 +1,11 @@
 #pragma once
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "ast_node.h"
+
+enum class LiteralType { Integer, Float, String, Char };
 
 enum class Type {
     Int,
@@ -19,20 +22,19 @@ enum class Type {
 struct Message {
     std::string_view target;
     std::string_view selector;
-    std::vector<ArgumentPair<std::string_view, Node*>> keyword_args;
+    std::vector<ArgumentPair<std::string_view, NodePtr>> keyword_args;
 
-    Message(
-        std::string_view target, std::string_view selector,
-        const std::vector<ArgumentPair<std::string_view, Node*>>& keyword_args)
-        : target(target), selector(selector), keyword_args(keyword_args) {}
-
-    ~Message() = default;
+    Message(std::string_view target, std::string_view selector,
+            std::vector<ArgumentPair<std::string_view, NodePtr>> keyword_args)
+        : target(target),
+          selector(selector),
+          keyword_args(std::move(keyword_args)) {}
 };
 
 struct MessageHandler {
     Message message;
-    Node* handler;
+    NodePtr handler;
 
-    MessageHandler(Message message, Node* handler)
-        : message(message), handler(handler) {}
+    MessageHandler(Message message, NodePtr handler)
+        : message(std::move(message)), handler(std::move(handler)) {}
 };

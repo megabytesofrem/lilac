@@ -107,6 +107,8 @@ class Token {
                 return "Unknown";
             case TokenType::Whitespace:
                 return "Whitespace";
+            case TokenType::Error:
+                return "Error";
             case TokenType::Comment:
                 return "Comment";
             case TokenType::Ident:

@@ -81,3 +81,5 @@ PageTable.AllocatePage!(0xcafe, 40000);
 ### Implementation Details
 Lilac does not target the Executable and Linking Format (ELF), as ELF lacks the ability to express dynamic
 selector based messaging. Lilac compiles to freestanding Mach-O using the `x86_64-apple-darwin` flag in `clang`, and provides `lilac-dyld` to parse and read Mach-O binaries and libraries on a Linux host.
+
+Build command: `clang --target=x86_64-unknown-darwin -ffreestanding -nostdlib -fuse-ld=lld main.c -o main`

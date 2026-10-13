@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "ast_node.h"
@@ -11,23 +12,26 @@
  */
 enum class ClassMethodVisibility { Public, Private };
 
+/**
+ * Represents a class method in the AST.
+ */
 struct ClassMethod {
     std::string_view name;
     ClassMethodVisibility visibility;
     Type returnType;
-    Node* body;
+    NodePtr body;
 
     ClassMethod(std::string_view name, ClassMethodVisibility visibility,
-                Type returnType, Node* body)
+                Type returnType, NodePtr body)
         : name(name),
           visibility(visibility),
           returnType(returnType),
-          body(body) {}
+          body(std::move(body)) {}
 
     std::string_view getName() const { return name; }
     ClassMethodVisibility getVisibility() const { return visibility; }
     Type getReturnType() const { return returnType; }
-    Node* getBody() const { return body; }
+    Node* getBody() const { return body.get(); }
 };
 
 /**
@@ -41,9 +45,8 @@ class ClassDefinition : public Item {
     std::vector<ClassMethod> methods;
 
    public:
-    ClassDefinition(std::string_view name,
-                    const std::vector<ClassMethod>& methods)
-        : name(name), methods(methods) {}
+    ClassDefinition(std::string_view name, std::vector<ClassMethod> methods)
+        : name(name), methods(std::move(methods)) {}
 
     std::string_view getName() const { return name; }
     std::string_view getSuperclass() const { return superclass; }

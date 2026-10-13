@@ -19,14 +19,14 @@ class AstVisitor {
             visitIdentifierExpr(*identifier);
         } else if (auto* array = dynamic_cast<ArrayExpr*>(node)) {
             visitArrayExpr(*array);
-            for (Node* element : array->getElements()) {
-                visit(element);
+            for (const NodePtr& element : array->getElements()) {
+                visit(element.get());
             }
         } else if (auto* call = dynamic_cast<CallExpr*>(node)) {
             visitCallExpr(*call);
             visit(call->getCallee());
-            for (Node* argument : call->getArguments()) {
-                visit(argument);
+            for (const NodePtr& argument : call->getArguments()) {
+                visit(argument.get());
             }
         } else if (auto* let = dynamic_cast<LetExpr*>(node)) {
             visitLetExpr(*let);
@@ -39,7 +39,19 @@ class AstVisitor {
             visitSelectorCall(*selector);
             visit(selector->getTarget());
             for (const auto& argument : selector->getArguments()) {
-                visit(argument.getValue());
+                visit(argument.getValue().get());
+            }
+        } else if (auto* chain = dynamic_cast<UnaryChain*>(node)) {
+            visitUnaryChain(*chain);
+            visit(chain->getTarget());
+            for (const NodePtr& element : chain->getElements()) {
+                visit(element.get());
+            }
+        } else if (auto* chain = dynamic_cast<BinaryChain*>(node)) {
+            visitBinaryChain(*chain);
+            visit(chain->getTarget());
+            for (const NodePtr& element : chain->getElements()) {
+                visit(element.get());
             }
         }
     }
@@ -73,7 +85,7 @@ class AstVisitor {
                 visitMessageHandler(handler);
                 visitMessage(handler.message);
                 visitMessageArguments(handler.message);
-                visit(handler.handler);
+                visit(handler.handler.get());
             }
         }
     }
@@ -89,6 +101,8 @@ class AstVisitor {
     virtual void visitLetExpr(LetExpr&) {}
     virtual void visitAssignExpr(AssignExpr&) {}
     virtual void visitSelectorCall(SelectorCall&) {}
+    virtual void visitUnaryChain(UnaryChain&) {}
+    virtual void visitBinaryChain(BinaryChain&) {}
 
     virtual void visitExprItem(ExprItem&) {}
     virtual void visitClassDefinition(ClassDefinition&) {}
@@ -101,7 +115,7 @@ class AstVisitor {
    private:
     void visitMessageArguments(const Message& message) {
         for (const auto& argument : message.keyword_args) {
-            visit(argument.getValue());
+            visit(argument.getValue().get());
         }
     }
 };

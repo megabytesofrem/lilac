@@ -1,5 +1,8 @@
 #pragma once
 
+#include <utility>
+#include <vector>
+
 #include "ast_node.h"
 #include "ast_types.h"
 
@@ -9,9 +12,8 @@ class ProtocolDefinition : public Item {
     std::vector<Message> messages;
 
    public:
-    ProtocolDefinition(std::string_view name,
-                       const std::vector<Message>& messages)
-        : name(name), messages(messages) {}
+    ProtocolDefinition(std::string_view name, std::vector<Message> messages)
+        : name(name), messages(std::move(messages)) {}
 
     std::string_view getName() const { return name; }
     const std::vector<Message>& getMessages() const { return messages; }
@@ -29,10 +31,10 @@ class ProtocolImplementation : public Item {
    public:
     ProtocolImplementation(std::string_view protocolName,
                            std::string_view targetName,
-                           const std::vector<MessageHandler>& handlers)
+                           std::vector<MessageHandler> handlers)
         : protocolName(protocolName),
           targetName(targetName),
-          handlers(handlers) {}
+          handlers(std::move(handlers)) {}
 
     std::string_view getProtocolName() const { return protocolName; }
     std::string_view getTargetName() const { return targetName; }

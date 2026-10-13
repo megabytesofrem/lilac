@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <string_view>
+#include <utility>
 #include <vector>
-
-#include "literal_type.h"
 
 /**
  * Represents a node in the AST.
@@ -12,6 +12,8 @@ class Node {
    public:
     virtual ~Node() = default;
 };
+
+using NodePtr = std::unique_ptr<Node>;
 
 /**
  * Represents a top-level item in the AST.
@@ -27,10 +29,9 @@ class ArgumentPair {
     V value;
 
    public:
-    ArgumentPair(K key, V value) : key(key), value(value) {}
+    ArgumentPair(K key, V value)
+        : key(std::move(key)), value(std::move(value)) {}
 
     const K& getKey() const { return key; }
     const V& getValue() const { return value; }
-
-    virtual ~ArgumentPair() = default;
 };

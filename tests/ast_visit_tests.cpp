@@ -1,4 +1,7 @@
 #include <cstdlib>
+#include <memory>
+#include <string_view>
+#include <utility>
 #include <variant>
 
 #include "ast_visit.h"
@@ -34,40 +37,63 @@ class CountingVisitor : public AstVisitor {
 };
 
 int main() {
-    LiteralExpr literal(42);
+    auto literal = std::make_unique<LiteralExpr>(42);
     LiteralExpr floatingLiteral(3.5);
     LiteralExpr stringLiteral(std::string_view("text"));
     LiteralExpr charLiteral('x');
     LiteralExpr boolLiteral(true);
 
-    check(std::get<int>(literal.getValue()) == 42);
+    check(std::get<int>(literal->getValue()) == 42);
     check(std::get<double>(floatingLiteral.getValue()) == 3.5);
     check(std::get<std::string_view>(stringLiteral.getValue()) == "text");
     check(std::get<char>(charLiteral.getValue()) == 'x');
     check(std::get<bool>(boolLiteral.getValue()) == true);
 
-    IdentifierExpr identifier("name");
-    CallExpr call(&identifier, {});
-    ArrayExpr array({&literal, &call});
-    LetExpr expression("value", &literal, &array);
+    auto identifier = std::make_unique<IdentifierExpr>("name");
+    std::vector<NodePtr> callArguments;
+    auto call = std::make_unique<CallExpr>(std::move(identifier),
+                                           std::move(callArguments));
+    std::vector<NodePtr> arrayElements;
+    arrayElements.push_back(std::move(literal));
+    arrayElements.push_back(std::move(call));
+    auto array = std::make_unique<ArrayExpr>(std::move(arrayElements));
+    auto expression = std::make_unique<LetExpr>(
+        "value", std::make_unique<LiteralExpr>(42), std::move(array));
 
     CountingVisitor visitor;
-    visitor.visit(&expression);
+    visitor.visit(expression.get());
     check(visitor.nodes == 6);
     check(visitor.literals == 2);
     check(visitor.identifiers == 1);
 
-    Message message("target", "selector", {{"argument", &identifier}});
-    ProtocolDefinition definition("protocol", {message});
-    ExprItem expressionItem(&literal);
-    SelectorCall selector(&identifier, "plus", {{"value", &literal}},
-                          CallArity::Keyword);
-    AssignExpr assignment("result", &literal);
-    ClassDefinition classDefinition(
-        "Example", {ClassMethod("method", ClassMethodVisibility::Public,
-                                Type::Void, &assignment)});
-    MessageHandler handler(message, &identifier);
-    ProtocolImplementation implementation("protocol", "Example", {handler});
+    std::vector<ArgumentPair<std::string_view, NodePtr>> messageArguments;
+    messageArguments.emplace_back("argument",
+                                  std::make_unique<IdentifierExpr>("name"));
+    Message message("target", "selector", std::move(messageArguments));
+    std::vector<Message> messages;
+    messages.push_back(std::move(message));
+    ProtocolDefinition definition("protocol", std::move(messages));
+    ExprItem expressionItem(std::make_unique<LiteralExpr>(42));
+    std::vector<ArgumentPair<std::string_view, NodePtr>> selectorArguments;
+    selectorArguments.emplace_back("value", std::make_unique<LiteralExpr>(42));
+    SelectorCall selector(std::make_unique<IdentifierExpr>("name"), "plus",
+                          std::move(selectorArguments), CallArity::Keyword);
+    AssignExpr assignment("result", std::make_unique<LiteralExpr>(42));
+    std::vector<ClassMethod> methods;
+    methods.emplace_back("method", ClassMethodVisibility::Public, Type::Void,
+                         std::make_unique<AssignExpr>(
+                             "result", std::make_unique<LiteralExpr>(42)));
+    ClassDefinition classDefinition("Example", std::move(methods));
+    std::vector<ArgumentPair<std::string_view, NodePtr>> handlerArguments;
+    handlerArguments.emplace_back("argument",
+                                  std::make_unique<IdentifierExpr>("name"));
+    MessageHandler handler(
+        Message("target", "selector", std::move(handlerArguments)),
+        std::make_unique<IdentifierExpr>("name"));
+    std::vector<MessageHandler> handlers;
+    handlers.push_back(std::move(handler));
+    ProtocolImplementation implementation("protocol", "Example",
+                                          std::move(handlers));
 
     visitor.visit(&definition);
     visitor.visit(&expressionItem);

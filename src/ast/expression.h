@@ -1,6 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -42,12 +44,13 @@ class IdentifierExpr : public Node {
  */
 class ArrayExpr : public Node {
    private:
-    std::vector<Node*> elements;
+    std::vector<NodePtr> elements;
 
    public:
-    ArrayExpr(const std::vector<Node*>& elements) : elements(elements) {}
+    explicit ArrayExpr(std::vector<NodePtr> elements)
+        : elements(std::move(elements)) {}
 
-    const std::vector<Node*>& getElements() const { return elements; }
+    const std::vector<NodePtr>& getElements() const { return elements; }
 
    public:
     virtual ~ArrayExpr() = default;
@@ -58,15 +61,15 @@ class ArrayExpr : public Node {
  */
 class CallExpr : public Node {
    private:
-    Node* callee;
-    std::vector<Node*> arguments;
+    NodePtr callee;
+    std::vector<NodePtr> arguments;
 
    public:
-    CallExpr(Node* callee, const std::vector<Node*>& arguments)
-        : callee(callee), arguments(arguments) {}
+    CallExpr(NodePtr callee, std::vector<NodePtr> arguments)
+        : callee(std::move(callee)), arguments(std::move(arguments)) {}
 
-    Node* getCallee() const { return callee; }
-    const std::vector<Node*>& getArguments() const { return arguments; }
+    Node* getCallee() const { return callee.get(); }
+    const std::vector<NodePtr>& getArguments() const { return arguments; }
 
    public:
     virtual ~CallExpr() = default;
@@ -78,16 +81,16 @@ class CallExpr : public Node {
 class LetExpr : public Node {
    private:
     std::string_view name;
-    Node* value;
-    Node* body;
+    NodePtr value;
+    NodePtr body;
 
    public:
-    LetExpr(std::string_view name, Node* value, Node* body)
-        : name(name), value(value), body(body) {}
+    LetExpr(std::string_view name, NodePtr value, NodePtr body)
+        : name(name), value(std::move(value)), body(std::move(body)) {}
 
     std::string_view getName() const { return name; }
-    Node* getValue() const { return value; }
-    Node* getBody() const { return body; }
+    Node* getValue() const { return value.get(); }
+    Node* getBody() const { return body.get(); }
 
    public:
     virtual ~LetExpr() = default;
@@ -99,13 +102,14 @@ class LetExpr : public Node {
 class AssignExpr : public Node {
    private:
     std::string_view name;
-    Node* value;
+    NodePtr value;
 
    public:
-    AssignExpr(std::string_view name, Node* value) : name(name), value(value) {}
+    AssignExpr(std::string_view name, NodePtr value)
+        : name(name), value(std::move(value)) {}
 
     std::string_view getName() const { return name; }
-    Node* getValue() const { return value; }
+    Node* getValue() const { return value.get(); }
 
    public:
     virtual ~AssignExpr() = default;
@@ -113,12 +117,12 @@ class AssignExpr : public Node {
 
 class ExprItem : public Item {
    private:
-    Node* expression;
+    NodePtr expression;
 
    public:
-    ExprItem(Node* expression) : expression(expression) {}
+    explicit ExprItem(NodePtr expression) : expression(std::move(expression)) {}
 
-    Node* getExpression() const { return expression; }
+    Node* getExpression() const { return expression.get(); }
 
    public:
     virtual ~ExprItem() = default;

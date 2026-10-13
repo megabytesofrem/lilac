@@ -11,6 +11,7 @@ target_sources(lilac PRIVATE
     src/main.cpp
 
     src/lexer.cpp
+    src/parser.cpp
 )
 
 include(CTest)
