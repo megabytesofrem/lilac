@@ -64,14 +64,18 @@ struct mach_header_64 {
 /**
  * Constants for the `flags` field in the Mach-O header.
  */
-#define MH_NOUNDEFS 0x1    /* no undefined references */
-#define MH_INCRLINK 0x2    /* the object file is the output of an incremental link */
-#define MH_DYLDLINK 0x4    /* the object file is the input for the dynamic linker */
-#define MH_BINDATLOAD 0x8  /* the object file has its dynamic undefined references bound at load time */
+#define MH_NOUNDEFS 0x1 /* no undefined references */
+#define MH_INCRLINK \
+    0x2 /* the object file is the output of an incremental link */
+#define MH_DYLDLINK \
+    0x4 /* the object file is the input for the dynamic linker */
+#define MH_BINDATLOAD \
+    0x8 /* the object file has its dynamic undefined references bound at load time */
 #define MH_PREBOUND 0x10   /* the object file is prebound */
 #define MH_SPLIT_SEGS 0x20 /* the object file has its segments split */
-#define MH_LAZY_INIT 0x40  /* the shared library initialization is lazy (obsolete) */
-#define MH_TWOLEVEL 0x80   /* the object file uses two-level namespace bindings */
+#define MH_LAZY_INIT \
+    0x40 /* the shared library initialization is lazy (obsolete) */
+#define MH_TWOLEVEL 0x80 /* the object file uses two-level namespace bindings */
 
 struct load_command {
     uint32_t cmd;     /* type of load command */
@@ -81,7 +85,8 @@ struct load_command {
 /**
  * Constants for the load command types in the Mach-O header.
  */
-#define LC_REQ_DYLD 0x80000000 /* this load command is required by the dynamic linker */
+#define LC_REQ_DYLD \
+    0x80000000 /* this load command is required by the dynamic linker */
 
 #define LC_SEGMENT_64 0x19 /* 64-bit segment of this file to be mapped */
 #define LC_SYMTAB 0x2      /* link-edit stab symbol table info */
@@ -140,6 +145,6 @@ struct entry_point_command {
 typedef struct mach_header mach_header_t;
 typedef struct mach_header_64 mach_header_64_t;
 typedef struct load_command load_command_t;
-typedef struct segment_command_64 segment_command_64_t;
-typedef struct section_64 section_64_t;
+typedef struct segment_command_64 segment_command_t;
+typedef struct section_64 section_t;
 typedef struct entry_point_command entry_point_command_t;

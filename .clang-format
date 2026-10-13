@@ -2,6 +2,9 @@
 BasedOnStyle: Google
 TabWidth: 4
 IndentWidth: 4
+ColumnLimit: 80
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
 
 # Always use spaces
 UseTab: Never
