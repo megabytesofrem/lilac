@@ -12,8 +12,8 @@ The language can be built using CMake: `cmake --build build`, and the tests can 
 ## Syntax
 
 ### Messages and Calls
-- Classical C function call for FFI (the equivalent of `NSLog`): `printf!("Hello world!);`
-- Smalltalk/Objective C messaging: `String byJoining: #["hello", "world"] with: ',';`
+- Classical C function call for FFI (the equivalent of `NSLog`): `Log!("Hello world!);`
+- Smalltalk/Objective C messaging: `[String byJoining: #["hello", "world"] with: ','];`
 
 ### Classes
 ```groovy
@@ -61,22 +61,6 @@ implement ResultOf for Result[A] {
 }
 ```
 
-### Higher Kinded Types
-```swift
-protocol FunctorOf [F: (* -> *) -> *, A: * -> *, B: * -> *] {
-  map (self) action:(Fn(F[A]) -> F[B]) -> F[B] 
-}
-
-implement FunctorOf for Result[A] {
-  override map (self) action:(Fn(Result[A]) -> Result[A]) -> Result[A] {
-    match self {
-      Ok { value } => [self action],
-      Err { .. } => ...
-    }
-  }
-}
-```
-
 ### Dropping down to C: Static Dispatch
 To support bare-metal development, Lilac allows calling and defining bang-functions (functions which are
 marked as static dispatch).
@@ -93,3 +77,7 @@ class PageTable {
 // Called like so:
 PageTable.AllocatePage!(0xcafe, 40000);
 ```
+
+### Implementation Details
+Lilac does not target the Executable and Linking Format (ELF), as ELF lacks the ability to express dynamic
+selector based messaging. Lilac compiles to freestanding Mach-O using the `x86_64-apple-darwin` flag in `clang`, and provides `lilac-dyld` to parse and read Mach-O binaries and libraries on a Linux host.
