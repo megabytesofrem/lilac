@@ -41,18 +41,6 @@ class AstVisitor {
             for (const auto& argument : selector->getArguments()) {
                 visit(argument.getValue().get());
             }
-        } else if (auto* chain = dynamic_cast<UnaryChain*>(node)) {
-            visitUnaryChain(*chain);
-            visit(chain->getTarget());
-            for (const NodePtr& element : chain->getElements()) {
-                visit(element.get());
-            }
-        } else if (auto* chain = dynamic_cast<BinaryChain*>(node)) {
-            visitBinaryChain(*chain);
-            visit(chain->getTarget());
-            for (const NodePtr& element : chain->getElements()) {
-                visit(element.get());
-            }
         }
     }
 
@@ -81,7 +69,8 @@ class AstVisitor {
         } else if (auto* implementation =
                        dynamic_cast<ProtocolImplementation*>(item)) {
             visitProtocolImplementation(*implementation);
-            for (const MessageHandler& handler : implementation->getHandlers()) {
+            for (const MessageHandler& handler :
+                 implementation->getHandlers()) {
                 visitMessageHandler(handler);
                 visitMessage(handler.message);
                 visitMessageArguments(handler.message);
@@ -101,8 +90,6 @@ class AstVisitor {
     virtual void visitLetExpr(LetExpr&) {}
     virtual void visitAssignExpr(AssignExpr&) {}
     virtual void visitSelectorCall(SelectorCall&) {}
-    virtual void visitUnaryChain(UnaryChain&) {}
-    virtual void visitBinaryChain(BinaryChain&) {}
 
     virtual void visitExprItem(ExprItem&) {}
     virtual void visitClassDefinition(ClassDefinition&) {}

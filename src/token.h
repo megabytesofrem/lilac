@@ -20,6 +20,33 @@ enum class TokenType {
     String,
 
     // Operators
+    Symbol,
+
+    // Keywords
+    KwTrue,
+    KwFalse,
+    KwIf,
+    KwElse,
+    KwWhile,
+    KwFor,
+    KwReturn,
+    KwLet,
+    KwDef,
+    KwEnum,
+    KwClass,
+    KwProtocol,
+    KwConforms,
+    KwField,
+    KwMethod,
+    KwPrivate,
+    KwPublic,
+    KwOverride,
+};
+
+enum class Symbol {
+    // Sentinel: Not a symbol
+    None,
+
     Plus,
     Minus,
     Star,
@@ -43,26 +70,6 @@ enum class TokenType {
     Comma,
     Colon,
     Semicolon,
-
-    // Keywords
-    KwTrue,
-    KwFalse,
-    KwIf,
-    KwElse,
-    KwWhile,
-    KwFor,
-    KwReturn,
-    KwLet,
-    KwDef,
-    KwEnum,
-    KwClass,
-    KwProtocol,
-    KwConforms,
-    KwField,
-    KwMethod,
-    KwPrivate,
-    KwPublic,
-    KwOverride,
 };
 
 /** Reserved keywords in the language */
@@ -75,14 +82,22 @@ static const char* reservedKeywords[] = {
 class Token {
    public:
     TokenType type;
+    Symbol symbol = Symbol::None;
+
     std::string_view lexeme;
     size_t length;
 
     Token(TokenType type, const char* lexeme, size_t length)
         : type(type), lexeme(lexeme, length), length(length) {}
 
+    Token(TokenType type, Symbol symbol, size_t length)
+        : type(type), symbol(symbol), lexeme(""), length(length) {}
+
     Token(TokenType type, std::string_view lexeme)
         : type(type), lexeme(lexeme), length(lexeme.size()) {}
+
+    Token(TokenType type, std::string_view lexeme, size_t length)
+        : type(type), lexeme(lexeme), length(length) {}
 
     Token(TokenType type) : type(type), lexeme(""), length(0) {}
 
@@ -95,6 +110,8 @@ class Token {
             std::begin(reservedKeywords), std::end(reservedKeywords),
             [this](const char* keyword) { return lexeme == keyword; });
     }
+
+    bool isSymbol() const { return type == TokenType::Symbol; }
 
     /** Returns true if the token is an identifier */
     bool isIdentifier() const { return type == TokenType::Ident; }
@@ -123,52 +140,8 @@ class Token {
                 return "String";
 
             // Operators
-            case TokenType::Plus:
-                return "Plus";
-            case TokenType::Minus:
-                return "Minus";
-            case TokenType::Star:
-                return "Star";
-            case TokenType::Slash:
-                return "Slash";
-            case TokenType::Equal:
-                return "Equal";
-            case TokenType::Bang:
-                return "Bang";
-            case TokenType::Less:
-                return "Less";
-            case TokenType::Greater:
-                return "Greater";
-            case TokenType::LessEqual:
-                return "LessEqual";
-            case TokenType::GreaterEqual:
-                return "GreaterEqual";
-            case TokenType::EqualEqual:
-                return "EqualEqual";
-            case TokenType::BangEqual:
-                return "BangEqual";
-            case TokenType::LParen:
-                return "LParen";
-            case TokenType::RParen:
-                return "RParen";
-            case TokenType::LBrace:
-                return "LBrace";
-            case TokenType::RBrace:
-                return "RBrace";
-            case TokenType::LBracket:
-                return "LBracket";
-            case TokenType::RBracket:
-                return "RBracket";
-            case TokenType::Dot:
-                return "Dot";
-            case TokenType::DotDot:
-                return "DotDot";
-            case TokenType::Comma:
-                return "Comma";
-            case TokenType::Colon:
-                return "Colon";
-            case TokenType::Semicolon:
-                return "Semicolon";
+            case TokenType::Symbol:
+                return "Symbol";
 
             // Keywords
             case TokenType::KwTrue:

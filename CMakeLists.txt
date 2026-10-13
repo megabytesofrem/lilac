@@ -23,4 +23,8 @@ if(BUILD_TESTING)
     add_executable(ast_visit_tests tests/ast_visit_tests.cpp)
     target_include_directories(ast_visit_tests PRIVATE src)
     add_test(NAME ast_visit_tests COMMAND ast_visit_tests)
+
+    add_executable(parser_tests tests/parser_tests.cpp src/parser.cpp src/lexer.cpp)
+    target_include_directories(parser_tests PRIVATE src)
+    add_test(NAME parser_tests COMMAND parser_tests)
 endif()

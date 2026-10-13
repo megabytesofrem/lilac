@@ -122,78 +122,79 @@ Token Lexer::scanString() const {
     // Strip the quotes from the string literal
     str.lexeme = source.substr(position + 1, str.length - 2);
 
-    return Token(str.type, source.substr(position, str.length));
+    return Token(str.type, str.lexeme, str.length);
 }
 
 Token Lexer::scanSymbol(char ch) const {
-    TokenType type = TokenType::Unknown;
+    Symbol sym = Symbol::None;
+
     size_t length = 1;
     const char next =
         position + 1 < source.size() ? source[position + 1] : '\0';
     switch (ch) {
         case '+':
-            type = TokenType::Plus;
+            sym = Symbol::Plus;
             break;
         case '-':
-            type = TokenType::Minus;
+            sym = Symbol::Minus;
             break;
         case '*':
-            type = TokenType::Star;
+            sym = Symbol::Star;
             break;
         case '/':
-            type = TokenType::Slash;
+            sym = Symbol::Slash;
             break;
         case '=':
-            type = next == '=' ? TokenType::EqualEqual : TokenType::Equal;
+            sym = next == '=' ? Symbol::EqualEqual : Symbol::Equal;
             length = next == '=' ? 2 : 1;
             break;
         case '!':
-            type = next == '=' ? TokenType::BangEqual : TokenType::Bang;
+            sym = next == '=' ? Symbol::BangEqual : Symbol::Bang;
             length = next == '=' ? 2 : 1;
             break;
         case '<':
-            type = next == '=' ? TokenType::LessEqual : TokenType::Less;
+            sym = next == '=' ? Symbol::LessEqual : Symbol::Less;
             length = next == '=' ? 2 : 1;
             break;
         case '>':
-            type = next == '=' ? TokenType::GreaterEqual : TokenType::Greater;
+            sym = next == '=' ? Symbol::GreaterEqual : Symbol::Greater;
             length = next == '=' ? 2 : 1;
             break;
         case '(':
-            type = TokenType::LParen;
+            sym = Symbol::LParen;
             break;
         case ')':
-            type = TokenType::RParen;
+            sym = Symbol::RParen;
             break;
         case '{':
-            type = TokenType::LBrace;
+            sym = Symbol::LBrace;
             break;
         case '}':
-            type = TokenType::RBrace;
+            sym = Symbol::RBrace;
             break;
         case '[':
-            type = TokenType::LBracket;
+            sym = Symbol::LBracket;
             break;
         case ']':
-            type = TokenType::RBracket;
+            sym = Symbol::RBracket;
             break;
         case '.':
-            type = next == '.' ? TokenType::DotDot : TokenType::Dot;
+            sym = next == '.' ? Symbol::DotDot : Symbol::Dot;
             length = next == '.' ? 2 : 1;
             break;
         case ',':
-            type = TokenType::Comma;
+            sym = Symbol::Comma;
             break;
         case ':':
-            type = TokenType::Colon;
+            sym = Symbol::Colon;
             break;
         case ';':
-            type = TokenType::Semicolon;
+            sym = Symbol::Semicolon;
             break;
         default:
             break;
     }
-    return Token(type, source.substr(position, length));
+    return Token(TokenType::Symbol, sym, length);
 }
 
 std::optional<Token> Lexer::peek() const {

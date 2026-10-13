@@ -1,14 +1,39 @@
 #include "parser.h"
 
 #include <memory>
+#include <string>
 #include <utility>
 
-std::optional<Token> Parser::peek() const { return lexer.peek(); }
+std::optional<Token> Parser::peekToken(size_t offset) {
+    while (bufferedTokens.size() <= offset) {
+        auto token = lexer.next();
+        if (!token.has_value()) {
+            return std::nullopt;
+        }
+        if (token->type == TokenType::Whitespace ||
+            token->type == TokenType::Comment) {
+            continue;
+        }
+        bufferedTokens.push_back(*token);
+        if (token->type == TokenType::Eof && bufferedTokens.size() <= offset) {
+            return std::nullopt;
+        }
+    }
+    return bufferedTokens[offset];
+}
 
-std::optional<Token> Parser::next() { return lexer.next(); }
+std::optional<Token> Parser::peek(size_t offset) { return peekToken(offset); }
 
-std::expected<Token, ParseError> Parser::look(TokenType type) {
-    auto token = peek();
+std::optional<Token> Parser::next() {
+    auto token = peekToken();
+    if (token.has_value()) {
+        bufferedTokens.pop_front();
+    }
+    return token;
+}
+
+std::expected<Token, ParseError> Parser::expect(TokenType type) {
+    auto token = next();
     if (!token.has_value()) {
         return std::unexpected(ParseError::EndOfInput);
     }
@@ -18,12 +43,12 @@ std::expected<Token, ParseError> Parser::look(TokenType type) {
     return *token;
 }
 
-std::expected<Token, ParseError> Parser::expect(TokenType type) {
+std::expected<Token, ParseError> Parser::expectSymbol(Symbol sym) {
     auto token = next();
     if (!token.has_value()) {
         return std::unexpected(ParseError::EndOfInput);
     }
-    if (token->type != type) {
+    if (token->type != TokenType::Symbol || token->symbol != sym) {
         return std::unexpected(ParseError::UnexpectedToken);
     }
     return *token;
@@ -94,7 +119,7 @@ std::expected<NodePtr, ParseError> Parser::parsePrimary() {
             return parseLiteral();
         case TokenType::Ident:
             return parseIdentifier();
-        case TokenType::LBracket:
+        case TokenType::Symbol:
             return parseSelectorCall();
         default:
             return std::unexpected(ParseError::UnexpectedToken);
@@ -102,8 +127,10 @@ std::expected<NodePtr, ParseError> Parser::parsePrimary() {
 }
 
 std::expected<NodePtr, ParseError> Parser::parseExpression() {
-    return parseBinaryChain();
+    return parsePrimary();
 }
+
+std::expected<NodePtr, ParseError> Parser::parse() { return parseExpression(); }
 
 std::expected<KeywordArgument, ParseError> Parser::parseKeywordArgument() {
     // A keyword argument consists of an identifier followed by a colon and an
@@ -112,7 +139,7 @@ std::expected<KeywordArgument, ParseError> Parser::parseKeywordArgument() {
     auto identifier = expect(TokenType::Ident);
     assert_expected(identifier);
 
-    auto colon = expect(TokenType::Colon);
+    auto colon = expectSymbol(Symbol::Colon);
     assert_expected(colon);
 
     auto value = parseExpression();
@@ -121,148 +148,100 @@ std::expected<KeywordArgument, ParseError> Parser::parseKeywordArgument() {
     return KeywordArgument(identifier->lexeme, std::move(*value));
 }
 
-std::expected<NodePtr, ParseError> Parser::parseUnarySelector() {
+std::expected<std::vector<KeywordArgument>, ParseError>
+Parser::parseKeywordSelector() {
+    // A keyword-based selector consists of one or more keyword arguments i.e.,
+    // `identifier: value` pairs
+    std::vector<KeywordArgument> arguments;
+
+    while (true) {
+        auto argument = parseKeywordArgument();
+        assert_expected(argument);
+        arguments.push_back(std::move(*argument));
+
+        auto nextToken = peek();
+        auto followingToken = peek(1);
+        if (!nextToken.has_value() || !nextToken->isIdentifier() ||
+            !followingToken.has_value() || !followingToken->isSymbol() ||
+            followingToken->symbol != Symbol::Colon) {
+            break;
+        }
+    }
+
+    return arguments;
+}
+
+std::expected<std::unique_ptr<UnarySelectorExpr>, ParseError>
+Parser::parseUnarySelector() {
     // A unary selector consists of an identifier not immediately followed by a
     // colon i.e `identifier` rather than `identifier:`
+
+    auto nextToken = peek(1);
+    if (nextToken.has_value() && nextToken->isSymbol() &&
+        nextToken->symbol == Symbol::Colon) {
+        return std::unexpected(ParseError::UnexpectedToken);
+    }
 
     auto identifier = expect(TokenType::Ident);
     assert_expected(identifier);
 
-    auto colon = look(TokenType::Colon);
-    assert_not_expected(colon);
-
     return std::make_unique<UnarySelectorExpr>(identifier->lexeme);
 }
 
-std::expected<NodePtr, ParseError> Parser::parseUnaryChain() {
-    // An Objective-C style unary message chain consists of one or more unary
-    // messages sent to a target, i.e., `target identifier1 identifier2 ...`
-
-    auto target = parsePrimary();
-    assert_expected(target);
-
-    std::vector<NodePtr> chain;
-    while (true) {
-        auto token = peek();
-        if (!token.has_value() || token->type != TokenType::Ident) {
-            break;
-        }
-        auto unary = parseUnarySelector();
-        if (!unary.has_value()) {
-            break;
-        }
-        chain.push_back(std::move(*unary));
-    }
-
-    // Construct a unary chain node or return the target if no unary messages
-    // were found
-    if (chain.empty()) {
-        return target;
-    }
-
-    // Make the chain with the target as the receiver and the collected unary
-    // messages as the elements.
-    return std::make_unique<UnaryChain>(
-        std::move(*target), std::move(chain), CallArity::Unary);
-}
-
-std::expected<NodePtr, ParseError> Parser::parseBinarySelector() {
-    auto token = peek();
-    if (!token.has_value()) {
-        return std::unexpected(ParseError::EndOfInput);
-    }
-
-    switch (token->type) {
-        case TokenType::Plus:
-        case TokenType::Minus:
-        case TokenType::Star:
-        case TokenType::Slash:
-        case TokenType::Equal:
-        case TokenType::EqualEqual:
-        case TokenType::BangEqual:
-        case TokenType::Less:
-        case TokenType::LessEqual:
-        case TokenType::Greater:
-        case TokenType::GreaterEqual:
-            break;
-        default:
-            return std::unexpected(ParseError::UnexpectedToken);
-    }
-
-    auto op = next();
-    auto value = parseUnaryChain();
-    assert_expected(value);
-
-    return std::make_unique<BinarySelectorExpr>(op->lexeme, std::move(*value));
-}
-
-std::expected<NodePtr, ParseError> Parser::parseBinaryChain() {
-    // An Objective-C style binary message chain consists of one or more binary
-    // messages sent to a target, i.e., `target op1 value1 op2 value2 ...`
-
-    auto target = parseUnaryChain();
-    assert_expected(target);
-
-    std::vector<NodePtr> chain;
-    while (true) {
-        auto token = peek();
-        if (!token.has_value()) {
-            break;
-        }
-        switch (token->type) {
-            case TokenType::Plus:
-            case TokenType::Minus:
-            case TokenType::Star:
-            case TokenType::Slash:
-            case TokenType::Equal:
-            case TokenType::EqualEqual:
-            case TokenType::BangEqual:
-            case TokenType::Less:
-            case TokenType::LessEqual:
-            case TokenType::Greater:
-            case TokenType::GreaterEqual:
-                break;
-            default:
-                return chain.empty()
-                           ? std::expected<NodePtr, ParseError>(
-                                 std::move(*target))
-                           : std::expected<NodePtr, ParseError>(
-                                 std::make_unique<BinaryChain>(
-                                     std::move(*target), std::move(chain),
-                                     CallArity::Binary));
-        }
-        auto binary = parseBinarySelector();
-        assert_expected(binary);
-        chain.push_back(std::move(*binary));
-    }
-
-    // Construct a binary chain node or return the target if no binary messages
-    // were found
-    if (chain.empty()) {
-        return target;
-    }
-
-    // Make the chain with the first operator as the selector and the rest of
-    // the binary messages as the elements.
-    return std::make_unique<BinaryChain>(
-        std::move(*target), std::move(chain), CallArity::Binary);
-}
-
 std::expected<NodePtr, ParseError> Parser::parseSelectorCall() {
-    auto openBracket = expect(TokenType::LBracket);
+    // An Objective-C style selector call which can either be keyword-based or
+    // unary message sends, i.e [target selector:arg] or [target selector]
+
+    auto openBracket = expectSymbol(Symbol::LBracket);
     assert_expected(openBracket);
 
     auto target = parsePrimary();
     assert_expected(target);
 
-    auto selector = expect(TokenType::Ident);
-    assert_expected(selector);
+    auto selectorToken = peek();
+    if (!selectorToken.has_value() || !selectorToken->isIdentifier()) {
+        return std::unexpected(ParseError::UnexpectedToken);
+    }
 
-    auto closeBracket = expect(TokenType::RBracket);
+    auto followingToken = peek(1);
+
+    // Check if the following token indicates a keyword-based selector call
+    if (followingToken.has_value() && followingToken->isSymbol() &&
+        followingToken->symbol == Symbol::Colon) {
+        auto keywordArguments = parseKeywordSelector();
+        assert_expected(keywordArguments);
+
+        std::vector<ArgumentPair<std::string_view, NodePtr>> arguments;
+        std::string selector;
+        for (auto& argument : *keywordArguments) {
+            selector.append(argument.getKeyword());
+            selector.push_back(':');
+            arguments.emplace_back(argument.getKeyword(), argument.takeValue());
+        }
+
+        auto closeBracket = expectSymbol(Symbol::RBracket);
+        assert_expected(closeBracket);
+
+        // Make the selector call node with the target, selector, and arguments
+        // and keyword call arity.
+        return std::make_unique<SelectorCall>(
+            std::move(*target), std::move(selector), std::move(arguments),
+            CallArity::Keyword);
+    }
+
+    auto unarySelector = parseUnarySelector();
+    assert_expected(unarySelector);
+    const std::string selector((*unarySelector)->getSelector());
+
+    // If it's not a keyword-based selector call, treat it as a unary message
+    // send.
+    auto closeBracket = expectSymbol(Symbol::RBracket);
     assert_expected(closeBracket);
 
-    return std::make_unique<SelectorCall>(std::move(*target), selector->lexeme,
-                                          std::vector<ArgumentPair<
-                                              std::string_view, NodePtr>>{},
-                                          CallArity::Unary);
+    // Make the selector call node with the target, selector, and unary call
+    // arity.
+    return std::make_unique<SelectorCall>(
+        std::move(*target), selector,
+        std::vector<ArgumentPair<std::string_view, NodePtr>>{},
+        CallArity::Unary);
 }
