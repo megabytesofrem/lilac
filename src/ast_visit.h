@@ -6,7 +6,7 @@ class AstVisitor {
    public:
     virtual ~AstVisitor() = default;
 
-    void visit(Node* node) {
+    void visit(ASTNode* node) {
         if (node == nullptr) {
             return;
         }
@@ -35,10 +35,28 @@ class AstVisitor {
         } else if (auto* unary = dynamic_cast<UnaryExpr*>(node)) {
             visitUnaryExpr(*unary);
             visit(unary->getOperand());
-        } else if (auto* let = dynamic_cast<LetExpr*>(node)) {
-            visitLetExpr(*let);
-            visit(let->getValue());
-            visit(let->getBody());
+        } else if (auto* let = dynamic_cast<LetStmt*>(node)) {
+            visitLetStmt(*let);
+            visit(let->value());
+        } else if (auto* block = dynamic_cast<BlockStmt*>(node)) {
+            visitBlockStmt(*block);
+            for (const NodePtr& statement : block->getStatements()) {
+                visit(statement.get());
+            }
+        } else if (auto* loop = dynamic_cast<ForStmt*>(node)) {
+            visitForStmt(*loop);
+            visit(loop->getInitializer().get());
+            visit(loop->getCondition().get());
+            visit(loop->getIncrement().get());
+            visit(loop->getBody().get());
+        } else if (auto* loop = dynamic_cast<ForeachStmt*>(node)) {
+            visitForeachStmt(*loop);
+            visit(loop->getCollection().get());
+            visit(loop->getBody().get());
+        } else if (auto* loop = dynamic_cast<WhileStmt*>(node)) {
+            visitWhileStmt(*loop);
+            visit(loop->getCondition().get());
+            visit(loop->getBody().get());
         } else if (auto* assignment = dynamic_cast<AssignExpr*>(node)) {
             visitAssignExpr(*assignment);
             visit(assignment->getValue());
@@ -51,7 +69,7 @@ class AstVisitor {
         }
     }
 
-    void visit(Item* item) {
+    void visit(ASTItem* item) {
         if (item == nullptr) {
             return;
         }
@@ -87,8 +105,8 @@ class AstVisitor {
     }
 
    protected:
-    virtual void visitNode(Node&) {}
-    virtual void visitItem(Item&) {}
+    virtual void visitNode(ASTNode&) {}
+    virtual void visitItem(ASTItem&) {}
 
     virtual void visitLiteralExpr(LiteralExpr&) {}
     virtual void visitIdentifierExpr(IdentifierExpr&) {}
@@ -96,7 +114,11 @@ class AstVisitor {
     virtual void visitCallExpr(CallExpr&) {}
     virtual void visitBinExpr(BinExpr&) {}
     virtual void visitUnaryExpr(UnaryExpr&) {}
-    virtual void visitLetExpr(LetExpr&) {}
+    virtual void visitLetStmt(LetStmt&) {}
+    virtual void visitBlockStmt(BlockStmt&) {}
+    virtual void visitForStmt(ForStmt&) {}
+    virtual void visitForeachStmt(ForeachStmt&) {}
+    virtual void visitWhileStmt(WhileStmt&) {}
     virtual void visitAssignExpr(AssignExpr&) {}
     virtual void visitSelectorCall(SelectorCall&) {}
 

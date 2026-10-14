@@ -6,21 +6,24 @@
 #include <vector>
 
 /**
- * Represents a node in the AST.
+ * A node in the AST.
  */
-class Node {
+class ASTNode {
    public:
-    virtual ~Node() = default;
+    virtual ~ASTNode() = default;
 };
 
-using NodePtr = std::unique_ptr<Node>;
+/**
+ * A smart pointer wrapper around an ASTNode.
+ */
+using NodePtr = std::unique_ptr<ASTNode>;
 
 /**
- * Represents a top-level item in the AST.
+ * A top-level item in the AST.
  */
-class Item {
+class ASTItem {
    public:
-    virtual ~Item() = default;
+    virtual ~ASTItem() = default;
 };
 
 template <typename K, typename V>

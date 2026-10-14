@@ -7,7 +7,7 @@
  * `identifier: value`
  */
 std::expected<KeywordArgument, ParseError> Parser::parseKeywordArgument() {
-    auto identifier = expect(TokenType::Ident);
+    auto identifier = parseIdentifier();
     assert_expected(identifier);
 
     auto colon = expectSymbol(Symbol::Colon);
@@ -16,7 +16,7 @@ std::expected<KeywordArgument, ParseError> Parser::parseKeywordArgument() {
     auto value = parseExpression();
     assert_expected(value);
 
-    return KeywordArgument(identifier->lexeme, std::move(*value));
+    return KeywordArgument(*identifier, std::move(*value));
 }
 
 /**
@@ -60,10 +60,10 @@ Parser::parseUnarySel() {
         return std::unexpected(ParseError::UnexpectedToken);
     }
 
-    auto identifier = expect(TokenType::Ident);
+    auto identifier = parseIdentifier();
     assert_expected(identifier);
 
-    return std::make_unique<UnarySelector>(identifier->lexeme);
+    return std::make_unique<UnarySelector>(*identifier);
 }
 
 /**
@@ -93,12 +93,13 @@ std::expected<NodePtr, ParseError> Parser::parseSelectorCall() {
         auto keywordArguments = parseKeywordSel();
         assert_expected(keywordArguments);
 
-        std::vector<ArgumentPair<std::string_view, NodePtr>> arguments;
+        std::vector<ArgumentPair<std::string, NodePtr>> arguments;
         std::string selector;
         for (auto& argument : *keywordArguments) {
             selector.append(argument.getKeyword());
             selector.push_back(':');
-            arguments.emplace_back(argument.getKeyword(), argument.takeValue());
+            arguments.emplace_back(std::string(argument.getKeyword()),
+                                   argument.takeValue());
         }
 
         auto closeBracket = expectSymbol(Symbol::RBracket);
@@ -124,6 +125,6 @@ std::expected<NodePtr, ParseError> Parser::parseSelectorCall() {
     // arity.
     return std::make_unique<SelectorCall>(
         std::move(*target), selector,
-        std::vector<ArgumentPair<std::string_view, NodePtr>>{},
+        std::vector<ArgumentPair<std::string, NodePtr>>{},
         CallArity::Unary);
 }

@@ -1,22 +1,31 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include "ast_node.h"
+#include "ast_types.h"
 
-class LetStmt : public Node {
+class LetStmt : public ASTNode {
    private:
-    std::string_view name_;
-    std::unique_ptr<Node> value_;
+    std::string _name;
+    std::unique_ptr<ASTNode> _value;
+
+    std::optional<TypeInfo> _type;
 
    public:
-    LetStmt(std::string_view name, std::unique_ptr<Node> value)
-        : name_(name), value_(std::move(value)) {}
+    LetStmt(std::string_view name,
+            std::unique_ptr<ASTNode> value,
+            std::optional<TypeInfo> type = std::nullopt)
+        : _name(name), _value(std::move(value)), _type(std::move(type)) {}
 
-    std::string_view name() const { return name_; }
-    const Node* value() const { return value_.get(); }
+    std::string_view name() const { return _name; }
+    ASTNode* value() { return _value.get(); }
+    const ASTNode* value() const { return _value.get(); }
+    const std::optional<TypeInfo>& type() const { return _type; }
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
@@ -11,7 +12,7 @@
 /**
  * A literal expression in the AST.
  */
-class LiteralExpr : public Node {
+class LiteralExpr : public ASTNode {
    public:
     using Value = std::variant<int, double, std::string_view, char, bool>;
 
@@ -26,14 +27,14 @@ class LiteralExpr : public Node {
 /**
  * An identifier expression in the AST.
  */
-class IdentifierExpr : public Node {
+class IdentifierExpr : public ASTNode {
    private:
-    std::string_view name;
+    std::string _name;
 
    public:
-    IdentifierExpr(std::string_view name) : name(name) {}
+    explicit IdentifierExpr(std::string_view name) : _name(name) {}
 
-    std::string_view getName() const { return name; }
+    std::string_view getName() const { return _name; }
 
    public:
     virtual ~IdentifierExpr() = default;
@@ -42,15 +43,15 @@ class IdentifierExpr : public Node {
 /**
  * An array expression in the AST.
  */
-class ArrayExpr : public Node {
+class ArrayExpr : public ASTNode {
    private:
-    std::vector<NodePtr> elements;
+    std::vector<NodePtr> _elements;
 
    public:
     explicit ArrayExpr(std::vector<NodePtr> elements)
-        : elements(std::move(elements)) {}
+        : _elements(std::move(elements)) {}
 
-    const std::vector<NodePtr>& getElements() const { return elements; }
+    const std::vector<NodePtr>& getElements() const { return _elements; }
 
    public:
     virtual ~ArrayExpr() = default;
@@ -59,17 +60,17 @@ class ArrayExpr : public Node {
 /**
  * A procedural call in the AST.
  */
-class CallExpr : public Node {
+class CallExpr : public ASTNode {
    private:
-    NodePtr callee;
-    std::vector<NodePtr> arguments;
+    NodePtr _callee;
+    std::vector<NodePtr> _arguments;
 
    public:
     CallExpr(NodePtr callee, std::vector<NodePtr> arguments)
-        : callee(std::move(callee)), arguments(std::move(arguments)) {}
+        : _callee(std::move(callee)), _arguments(std::move(arguments)) {}
 
-    Node* getCallee() const { return callee.get(); }
-    const std::vector<NodePtr>& getArguments() const { return arguments; }
+    ASTNode* getCallee() const { return _callee.get(); }
+    const std::vector<NodePtr>& getArguments() const { return _arguments; }
 
    public:
     virtual ~CallExpr() = default;
@@ -78,67 +79,68 @@ class CallExpr : public Node {
 /**
  * A binary expression in the AST.
  */
-class BinExpr : public Node {
+class BinExpr : public ASTNode {
    private:
-    std::string operatorSymbol;
-    NodePtr left;
-    NodePtr right;
+    std::string _operatorSymbol;
+    NodePtr _left;
+    NodePtr _right;
 
    public:
     BinExpr(std::string operatorSymbol, NodePtr left, NodePtr right)
-        : operatorSymbol(std::move(operatorSymbol)),
-          left(std::move(left)),
-          right(std::move(right)) {}
+        : _operatorSymbol(std::move(operatorSymbol)),
+          _left(std::move(left)),
+          _right(std::move(right)) {}
 
-    std::string_view getOperator() const { return operatorSymbol; }
-    Node* getLeft() const { return left.get(); }
-    Node* getRight() const { return right.get(); }
+    std::string_view getOperator() const { return _operatorSymbol; }
+    ASTNode* getLeft() const { return _left.get(); }
+    ASTNode* getRight() const { return _right.get(); }
 };
 
 /**
  * A unary expression in the AST.
  */
-class UnaryExpr : public Node {
+class UnaryExpr : public ASTNode {
    private:
-    std::string operatorSymbol;
-    NodePtr operand;
+    std::string _operatorSymbol;
+    NodePtr _operand;
 
    public:
     UnaryExpr(std::string operatorSymbol, NodePtr operand)
-        : operatorSymbol(std::move(operatorSymbol)),
-          operand(std::move(operand)) {}
+        : _operatorSymbol(std::move(operatorSymbol)),
+          _operand(std::move(operand)) {}
 
-    std::string_view getOperator() const { return operatorSymbol; }
-    Node* getOperand() const { return operand.get(); }
+    std::string_view getOperator() const { return _operatorSymbol; }
+    ASTNode* getOperand() const { return _operand.get(); }
 };
 
 /**
  * An assignment expression in the AST.
  */
-class AssignExpr : public Node {
+class AssignExpr : public ASTNode {
    private:
-    std::string_view name;
-    NodePtr value;
+    std::string _name;
+    NodePtr _value;
 
    public:
     AssignExpr(std::string_view name, NodePtr value)
-        : name(name), value(std::move(value)) {}
+        : _name(name), _value(std::move(value)) {}
 
-    std::string_view getName() const { return name; }
-    Node* getValue() const { return value.get(); }
+    std::string_view getName() const { return _name; }
+    ASTNode* getValue() const { return _value.get(); }
 
    public:
     virtual ~AssignExpr() = default;
 };
 
-class ExprItem : public Item {
+class ExprItem : public ASTItem {
    private:
-    NodePtr expression;
+    NodePtr _expression;
 
    public:
-    explicit ExprItem(NodePtr expression) : expression(std::move(expression)) {}
+    explicit ExprItem(NodePtr expression)
+        : _expression(std::move(expression)) {}
 
-    Node* getExpression() const { return expression.get(); }
+    ASTNode* getExpression() const { return _expression.get(); }
 
    public:
     virtual ~ExprItem() = default;

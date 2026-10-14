@@ -45,7 +45,7 @@ std::optional<Token> Parser::next() {
  */
 std::expected<Token, ParseError> Parser::expect(TokenType type) {
     auto token = next();
-    if (!token.has_value()) {
+    if (!token.has_value() || token->type == TokenType::Eof) {
         return std::unexpected(ParseError::EndOfInput);
     }
     if (token->type != type) {
@@ -59,7 +59,7 @@ std::expected<Token, ParseError> Parser::expect(TokenType type) {
  */
 std::expected<Token, ParseError> Parser::expectSymbol(Symbol sym) {
     auto token = next();
-    if (!token.has_value()) {
+    if (!token.has_value() || token->type == TokenType::Eof) {
         return std::unexpected(ParseError::EndOfInput);
     }
     if (token->type != TokenType::Symbol || token->symbol != sym) {
@@ -70,4 +70,6 @@ std::expected<Token, ParseError> Parser::expectSymbol(Symbol sym) {
 
 // MARK: Parser Methods
 
-std::expected<NodePtr, ParseError> Parser::parse() { return parseExpression(); }
+std::expected<NodePtr, ParseError> Parser::parse() {
+    return parseStatement();
+}

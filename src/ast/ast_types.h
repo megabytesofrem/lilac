@@ -1,4 +1,6 @@
 #pragma once
+#include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -29,16 +31,16 @@ enum class Type {
 struct TypeInfo {
     Type type;
 
-    union Data {
-        std::string_view value; /* String value for the type*/
-        TypeInfo* childType;    /* Child type info, if any */
+    struct Data {
+        std::string value;
+        std::unique_ptr<TypeInfo> childType;
 
-        constexpr Data() : childType(nullptr) {}
+        Data() = default;
 
-        constexpr explicit Data(std::string_view value) : value(value) {}
-        constexpr explicit Data(TypeInfo* childType) : childType(childType) {}
-        constexpr explicit Data(std::unique_ptr<TypeInfo> childType)
-            : childType(childType.release()) {}
+        explicit Data(std::string_view value) : value(value) {}
+        explicit Data(TypeInfo* childType) : childType(childType) {}
+        explicit Data(std::unique_ptr<TypeInfo> childType)
+            : childType(std::move(childType)) {}
     } data;
 
     explicit TypeInfo(Type type) : type(type), data() {}
@@ -47,6 +49,21 @@ struct TypeInfo {
     TypeInfo(Type type, TypeInfo* childType) : type(type), data(childType) {}
     TypeInfo(Type type, std::unique_ptr<TypeInfo> childType)
         : type(type), data(std::move(childType)) {}
+
+    TypeInfo(const TypeInfo& other) : type(other.type) {
+        data.value = other.data.value;
+        if (other.data.childType) {
+            data.childType = std::make_unique<TypeInfo>(*other.data.childType);
+        }
+    }
+    TypeInfo& operator=(const TypeInfo& other) {
+        if (this != &other) {
+            *this = TypeInfo(other);
+        }
+        return *this;
+    }
+    TypeInfo(TypeInfo&&) noexcept = default;
+    TypeInfo& operator=(TypeInfo&&) noexcept = default;
 };
 
 struct Message {

@@ -21,29 +21,17 @@ std::expected<TypeInfo, ParseError> Parser::parseType() {
     switch (token->type) {
         case TokenType::Symbol:
             /* *Type indicates a raw pointer */
-            if (token->symbol == Symbol::Star) {
+            if (token->symbol == Symbol::Star ||
+                token->symbol == Symbol::Tilde) {
                 auto innerType = this->parseType();
                 if (!innerType.has_value()) {
                     return std::unexpected(ParseError::ExpectedAType);
                 }
 
                 // Make the inner type info a child of the pointer type
-                return TypeInfo(Type::Pointer,
-                                std::make_unique<TypeInfo>(innerType.value()));
-            } else {
-                return std::unexpected(ParseError::UnexpectedToken);
-            }
-
-            /* ~Type indicates an ARC type */
-            if (token->symbol == Symbol::Tilde) {
-                auto innerType = this->parseType();
-                if (!innerType.has_value()) {
-                    return std::unexpected(ParseError::ExpectedAType);
-                }
-
-                // Make the inner type info a child of the ARC type
-                return TypeInfo(Type::ARC,
-                                std::make_unique<TypeInfo>(innerType.value()));
+                return TypeInfo(token->symbol == Symbol::Star ? Type::Pointer
+                                                             : Type::ARC,
+                                std::make_unique<TypeInfo>(std::move(*innerType)));
             } else {
                 return std::unexpected(ParseError::UnexpectedToken);
             }

@@ -29,6 +29,8 @@ enum class TokenType {
     KwElse,
     KwWhile,
     KwFor,
+    KwForeach,
+    KwIn,
     KwReturn,
     KwLet,
     KwDef,
@@ -88,9 +90,9 @@ enum class Symbol {
 
 /** Reserved keywords in the language */
 static const char* reservedKeywords[] = {
-    "true",     "false", "if",     "else",    "while",  "for",
-    "return",   "let",   "def",    "enum",    "class",  "protocol",
-    "conforms", "field", "method", "private", "public", "override",
+    "true",   "false",  "if",      "else",   "while",    "for",      "foreach",
+    "in",     "return", "let",    "def",     "enum",   "class",    "protocol", "conforms",
+    "field",  "method", "private", "public", "override",
 };
 
 class Token {
@@ -227,6 +229,10 @@ class Token {
                 return "KwWhile";
             case TokenType::KwFor:
                 return "KwFor";
+            case TokenType::KwForeach:
+                return "KwForeach";
+            case TokenType::KwIn:
+                return "KwIn";
             case TokenType::KwReturn:
                 return "KwReturn";
             case TokenType::KwLet:

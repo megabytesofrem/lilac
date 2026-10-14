@@ -24,6 +24,10 @@ Token Lexer::extractKeyword(const std::string_view keyword) const {
         return Token(TokenType::KwWhile);
     } else if (keyword == "for") {
         return Token(TokenType::KwFor);
+    } else if (keyword == "foreach") {
+        return Token(TokenType::KwForeach);
+    } else if (keyword == "in") {
+        return Token(TokenType::KwIn);
     } else if (keyword == "return") {
         return Token(TokenType::KwReturn);
     } else if (keyword == "let") {
@@ -140,6 +144,9 @@ Token Lexer::scanSymbol(char ch) const {
             break;
         case '*':
             sym = Symbol::Star;
+            break;
+        case '~':
+            sym = Symbol::Tilde;
             break;
         case '/':
             sym = Symbol::Slash;

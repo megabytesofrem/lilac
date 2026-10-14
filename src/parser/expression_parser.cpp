@@ -91,11 +91,11 @@ std::expected<NodePtr, ParseError> Parser::parseStringLiteral() {
 /**
  * Parse an identifier i.e `variableName`
  */
-std::expected<NodePtr, ParseError> Parser::parseIdentifier() {
+std::expected<std::string, ParseError> Parser::parseIdentifier() {
     auto token = expect(TokenType::Ident);
     assert_expected(token);
 
-    return std::make_unique<IdentifierExpr>(token->lexeme);
+    return std::string(token->lexeme);
 }
 
 /**
@@ -114,6 +114,10 @@ std::expected<NodePtr, ParseError> Parser::parseLiteral() {
             return parseFloatLiteral();
         case TokenType::String:
             return parseStringLiteral();
+        case TokenType::KwTrue:
+        case TokenType::KwFalse:
+            next();
+            return std::make_unique<LiteralExpr>(token->type == TokenType::KwTrue);
         default:
             return std::unexpected(ParseError::UnexpectedToken);
     }
@@ -160,9 +164,14 @@ std::expected<NodePtr, ParseError> Parser::parsePrimary() {
         case TokenType::Number:
         case TokenType::Float:
         case TokenType::String:
+        case TokenType::KwTrue:
+        case TokenType::KwFalse:
             return parseLiteral();
-        case TokenType::Ident:
-            return parseIdentifier();
+        case TokenType::Ident: {
+            auto name = parseIdentifier();
+            assert_expected(name);
+            return std::make_unique<IdentifierExpr>(std::move(*name));
+        }
         default:
             return std::unexpected(ParseError::UnexpectedToken);
     }

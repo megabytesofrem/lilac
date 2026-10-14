@@ -15,26 +15,26 @@ enum class CallArity { Unary, Binary, Keyword };
 
 class KeywordArgument {
    private:
-    std::string_view keyword;
-    NodePtr value;
+    std::string _keyword;
+    NodePtr _value;
 
    public:
     KeywordArgument(std::string_view keyword, NodePtr value)
-        : keyword(keyword), value(std::move(value)) {}
+        : _keyword(keyword), _value(std::move(value)) {}
 
-    std::string_view getKeyword() const { return keyword; }
-    Node* getValue() const { return value.get(); }
-    NodePtr takeValue() { return std::move(value); }
+    std::string_view getKeyword() const { return _keyword; }
+    ASTNode* getValue() const { return _value.get(); }
+    NodePtr takeValue() { return std::move(_value); }
 };
 
-class UnarySelector : public Node {
+class UnarySelector : public ASTNode {
    private:
-    std::string_view selector;
+    std::string _selector;
 
    public:
-    UnarySelector(std::string_view selector) : selector(selector) {}
+    UnarySelector(std::string_view selector) : _selector(selector) {}
 
-    std::string_view getSelector() const { return selector; }
+    std::string_view getSelector() const { return _selector; }
 
    public:
     virtual ~UnarySelector() = default;
@@ -48,30 +48,31 @@ class UnarySelector : public Node {
  *
  * The arity indicates whether the call is unary, binary, or keyword-based.
  */
-class SelectorCall : public Node {
+class SelectorCall : public ASTNode {
    private:
-    NodePtr target;
-    std::string selector;
-    std::vector<ArgumentPair<std::string_view, NodePtr>> arguments;
-    CallArity arity;
+    NodePtr _target;
+    std::string _selector;
+    std::vector<ArgumentPair<std::string, NodePtr>> _arguments;
+    CallArity _arity;
 
    public:
     SelectorCall(NodePtr target,
                  std::string selector,
-                 std::vector<ArgumentPair<std::string_view, NodePtr>> arguments,
+                 std::vector<ArgumentPair<std::string, NodePtr>> arguments,
                  CallArity arity)
-        : target(std::move(target)),
-          selector(std::move(selector)),
-          arguments(std::move(arguments)),
-          arity(arity) {}
+        : _target(std::move(target)),
+          _selector(std::move(selector)),
+          _arguments(std::move(arguments)),
+          _arity(arity) {}
 
-    Node* getTarget() const { return target.get(); }
-    std::string_view getSelector() const { return selector; }
-    const std::vector<ArgumentPair<std::string_view, NodePtr>>& getArguments()
+    ASTNode* getTarget() const { return _target.get(); }
+    std::string_view getSelector() const { return _selector; }
+
+    const std::vector<ArgumentPair<std::string, NodePtr>>& getArguments()
         const {
-        return arguments;
+        return _arguments;
     }
-    CallArity getArity() const { return arity; }
+    CallArity getArity() const { return _arity; }
 
    public:
     virtual ~SelectorCall() = default;
