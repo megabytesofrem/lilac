@@ -41,10 +41,9 @@ class Parser {
     std::expected<NodePtr, ParseError> parseStringLiteral();
     std::expected<NodePtr, ParseError> parseLiteral();
     std::expected<NodePtr, ParseError> parseIdentifier();
-    std::expected<NodePtr, ParseError> parseFactor();
-    std::expected<NodePtr, ParseError> parseTerm();
     std::expected<NodePtr, ParseError> parsePrimary();
-    std::expected<NodePtr, ParseError> parseExpression();
+    std::expected<NodePtr, ParseError> parseExpression(
+        int minimumPrecedence = 1);
 
     std::expected<KeywordArgument, ParseError> parseKeywordArgument();
     std::expected<std::vector<KeywordArgument>, ParseError> parseKeywordSel();

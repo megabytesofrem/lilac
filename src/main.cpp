@@ -15,7 +15,7 @@ int main(void) {
         if (token->type == TokenType::Eof) {
             break;
         }
-        std::cout << "Token type: " << token->tokenTypeToString()
+        std::cout << "Token type: " << token->describeTokenType()
                   << ", lexeme: '" << token->lexeme << "'"
                   << ", length: " << token->length << '\n';
     }

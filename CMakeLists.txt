@@ -15,6 +15,8 @@ target_sources(lilac PRIVATE
 
     # Parser modules
     src/parser/expression_parser.cpp
+    src/parser/selector_call_parser.cpp
+    src/parser/type_parser.cpp
 )
 
 include(CTest)
@@ -32,6 +34,8 @@ if(BUILD_TESTING)
         tests/parser_tests.cpp
         src/parser.cpp
         src/parser/expression_parser.cpp
+        src/parser/selector_call_parser.cpp
+        src/parser/type_parser.cpp
         src/lexer.cpp
     )
     target_include_directories(parser_tests PRIVATE src)

@@ -125,12 +125,69 @@ class Token {
             [this](const char* keyword) { return lexeme == keyword; });
     }
 
+    /** Returns true if the token is a symbol */
     bool isSymbol() const { return type == TokenType::Symbol; }
 
     /** Returns true if the token is an identifier */
     bool isIdentifier() const { return type == TokenType::Ident; }
 
-    std::string_view tokenTypeToString() const {
+    std::string_view describeSymbol() const {
+        switch (symbol) {
+            case Symbol::None:
+                return "None";
+            case Symbol::Plus:
+                return "Plus";
+            case Symbol::Minus:
+                return "Minus";
+            case Symbol::Star:
+                return "Star";
+            case Symbol::Slash:
+                return "Slash";
+            case Symbol::Equal:
+                return "Equal";
+            case Symbol::Bang:
+                return "Bang";
+            case Symbol::Tilde:
+                return "Tilde";
+            case Symbol::Less:
+                return "Less";
+            case Symbol::Greater:
+                return "Greater";
+            case Symbol::LessEqual:
+                return "LessEqual";
+            case Symbol::GreaterEqual:
+                return "GreaterEqual";
+            case Symbol::EqualEqual:
+                return "EqualEqual";
+            case Symbol::BangEqual:
+                return "BangEqual";
+            case Symbol::LParen:
+                return "LParen";
+            case Symbol::RParen:
+                return "RParen";
+            case Symbol::LBrace:
+                return "LBrace";
+            case Symbol::RBrace:
+                return "RBrace";
+            case Symbol::LBracket:
+                return "LBracket";
+            case Symbol::RBracket:
+                return "RBracket";
+            case Symbol::Dot:
+                return "Dot";
+            case Symbol::DotDot:
+                return "DotDot";
+            case Symbol::Comma:
+                return "Comma";
+            case Symbol::Colon:
+                return "Colon";
+            case Symbol::Semicolon:
+                return "Semicolon";
+        }
+        return "Unknown";
+    }
+
+    std::string_view describeTokenType() const {
         switch (type) {
             case TokenType::Eof:
                 return "Eof";
@@ -155,7 +212,7 @@ class Token {
 
             // Operators
             case TokenType::Symbol:
-                return "Symbol";
+                return describeSymbol();
 
             // Keywords
             case TokenType::KwTrue:
@@ -194,6 +251,28 @@ class Token {
                 return "KwPublic";
             case TokenType::KwOverride:
                 return "KwOverride";
+            case TokenType::KwI16:
+                return "KwI16";
+            case TokenType::KwI32:
+                return "KwI32";
+            case TokenType::KwI64:
+                return "KwI64";
+            case TokenType::KwU16:
+                return "KwU16";
+            case TokenType::KwU32:
+                return "KwU32";
+            case TokenType::KwU64:
+                return "KwU64";
+            case TokenType::KwF32:
+                return "KwF32";
+            case TokenType::KwF64:
+                return "KwF64";
+            case TokenType::KwBool:
+                return "KwBool";
+            case TokenType::KwString:
+                return "KwString";
+            case TokenType::KwVoid:
+                return "KwVoid";
         }
         return "Unknown";
     }

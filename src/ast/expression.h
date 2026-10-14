@@ -9,7 +9,7 @@
 #include "ast_node.h"
 
 /**
- * Represents a literal expression in the AST.
+ * A literal expression in the AST.
  */
 class LiteralExpr : public Node {
    public:
@@ -24,7 +24,7 @@ class LiteralExpr : public Node {
 };
 
 /**
- * Represents an identifier expression in the AST.
+ * An identifier expression in the AST.
  */
 class IdentifierExpr : public Node {
    private:
@@ -40,7 +40,7 @@ class IdentifierExpr : public Node {
 };
 
 /**
- * Represents an array expression in the AST.
+ * An array expression in the AST.
  */
 class ArrayExpr : public Node {
    private:
@@ -57,7 +57,7 @@ class ArrayExpr : public Node {
 };
 
 /**
- * Represents a procedural call in the AST.
+ * A procedural call in the AST.
  */
 class CallExpr : public Node {
    private:
@@ -76,7 +76,44 @@ class CallExpr : public Node {
 };
 
 /**
- * Represents an assignment expression in the AST.
+ * A binary expression in the AST.
+ */
+class BinExpr : public Node {
+   private:
+    std::string operatorSymbol;
+    NodePtr left;
+    NodePtr right;
+
+   public:
+    BinExpr(std::string operatorSymbol, NodePtr left, NodePtr right)
+        : operatorSymbol(std::move(operatorSymbol)),
+          left(std::move(left)),
+          right(std::move(right)) {}
+
+    std::string_view getOperator() const { return operatorSymbol; }
+    Node* getLeft() const { return left.get(); }
+    Node* getRight() const { return right.get(); }
+};
+
+/**
+ * A unary expression in the AST.
+ */
+class UnaryExpr : public Node {
+   private:
+    std::string operatorSymbol;
+    NodePtr operand;
+
+   public:
+    UnaryExpr(std::string operatorSymbol, NodePtr operand)
+        : operatorSymbol(std::move(operatorSymbol)),
+          operand(std::move(operand)) {}
+
+    std::string_view getOperator() const { return operatorSymbol; }
+    Node* getOperand() const { return operand.get(); }
+};
+
+/**
+ * An assignment expression in the AST.
  */
 class AssignExpr : public Node {
    private:

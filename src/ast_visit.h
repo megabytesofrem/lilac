@@ -28,6 +28,13 @@ class AstVisitor {
             for (const NodePtr& argument : call->getArguments()) {
                 visit(argument.get());
             }
+        } else if (auto* binary = dynamic_cast<BinExpr*>(node)) {
+            visitBinExpr(*binary);
+            visit(binary->getLeft());
+            visit(binary->getRight());
+        } else if (auto* unary = dynamic_cast<UnaryExpr*>(node)) {
+            visitUnaryExpr(*unary);
+            visit(unary->getOperand());
         } else if (auto* let = dynamic_cast<LetExpr*>(node)) {
             visitLetExpr(*let);
             visit(let->getValue());
@@ -87,6 +94,8 @@ class AstVisitor {
     virtual void visitIdentifierExpr(IdentifierExpr&) {}
     virtual void visitArrayExpr(ArrayExpr&) {}
     virtual void visitCallExpr(CallExpr&) {}
+    virtual void visitBinExpr(BinExpr&) {}
+    virtual void visitUnaryExpr(UnaryExpr&) {}
     virtual void visitLetExpr(LetExpr&) {}
     virtual void visitAssignExpr(AssignExpr&) {}
     virtual void visitSelectorCall(SelectorCall&) {}

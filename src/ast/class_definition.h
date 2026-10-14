@@ -13,7 +13,7 @@
 enum class ClassMethodVisibility { Public, Private };
 
 /**
- * Represents a class method in the AST.
+ * A class method in the AST.
  */
 struct ClassMethod {
     std::string_view name;
@@ -21,8 +21,10 @@ struct ClassMethod {
     Type returnType;
     NodePtr body;
 
-    ClassMethod(std::string_view name, ClassMethodVisibility visibility,
-                Type returnType, NodePtr body)
+    ClassMethod(std::string_view name,
+                ClassMethodVisibility visibility,
+                Type returnType,
+                NodePtr body)
         : name(name),
           visibility(visibility),
           returnType(returnType),
@@ -35,7 +37,7 @@ struct ClassMethod {
 };
 
 /**
- * Represents a class definition in the AST.
+ * A class definition in the AST.
  */
 class ClassDefinition : public Item {
    private:
