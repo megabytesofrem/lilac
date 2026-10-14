@@ -27,17 +27,17 @@ class KeywordArgument {
     NodePtr takeValue() { return std::move(value); }
 };
 
-class UnarySelectorExpr : public Node {
+class UnarySelector : public Node {
    private:
     std::string_view selector;
 
    public:
-    UnarySelectorExpr(std::string_view selector) : selector(selector) {}
+    UnarySelector(std::string_view selector) : selector(selector) {}
 
     std::string_view getSelector() const { return selector; }
 
    public:
-    virtual ~UnarySelectorExpr() = default;
+    virtual ~UnarySelector() = default;
 };
 
 /**
@@ -56,7 +56,8 @@ class SelectorCall : public Node {
     CallArity arity;
 
    public:
-    SelectorCall(NodePtr target, std::string selector,
+    SelectorCall(NodePtr target,
+                 std::string selector,
                  std::vector<ArgumentPair<std::string_view, NodePtr>> arguments,
                  CallArity arity)
         : target(std::move(target)),

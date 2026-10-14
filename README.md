@@ -34,7 +34,7 @@ class Person conforms (Object) {
 Lilac gives the developer the power of Rust ADTs.
 
 ```swift
-enum Result[A] {
+enum Result<A> {
   Ok { 
     value: A 
   },
@@ -49,7 +49,7 @@ protocol ResultOf {
   isSuccessful (self) -> Bool
 }
 
-implement ResultOf for Result[A] {
+implement ResultOf for Result<A> {
   override isAnError (self) -> Bool { 
     match self {
       Ok { .. } => false,

@@ -76,27 +76,6 @@ class CallExpr : public Node {
 };
 
 /**
- * Represents a let expression in the AST.
- */
-class LetExpr : public Node {
-   private:
-    std::string_view name;
-    NodePtr value;
-    NodePtr body;
-
-   public:
-    LetExpr(std::string_view name, NodePtr value, NodePtr body)
-        : name(name), value(std::move(value)), body(std::move(body)) {}
-
-    std::string_view getName() const { return name; }
-    Node* getValue() const { return value.get(); }
-    Node* getBody() const { return body.get(); }
-
-   public:
-    virtual ~LetExpr() = default;
-};
-
-/**
  * Represents an assignment expression in the AST.
  */
 class AssignExpr : public Node {

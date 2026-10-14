@@ -41,6 +41,19 @@ enum class TokenType {
     KwPrivate,
     KwPublic,
     KwOverride,
+
+    // Type names
+    KwI16,
+    KwI32,
+    KwI64,
+    KwU16,
+    KwU32,
+    KwU64,
+    KwF32,
+    KwF64,
+    KwBool,
+    KwString,
+    KwVoid
 };
 
 enum class Symbol {
@@ -53,6 +66,7 @@ enum class Symbol {
     Slash,
     Equal,
     Bang,
+    Tilde,
     Less,
     Greater,
     LessEqual,
