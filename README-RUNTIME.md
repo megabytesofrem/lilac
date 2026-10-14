@@ -1,6 +1,8 @@
 # lilac-runtime
 
-Lilac targets Mach-O for its planned code generation backend, as Mach-O natively supports sections in the executable dedicated
-to selector and method lookup - which would have required disgusting hacks for ELF.
+Lilac does not target the Executable and Linking Format (ELF), as ELF lacks the ability to express dynamic
+selector based messaging. Lilac compiles to freestanding Mach-O using the `x86_64-apple-darwin` flag in `clang`, and provides `lilac-dyld` to parse and read Mach-O binaries and libraries on a Linux host.
+
+This is deliberate, as Mach-O allows us to represent selectors and class information within the binary which ELF misses.
 
 `runtime/mach` implements the Mach-O loader (`lilac-dyld`) as Linux cannot natively read a Mach-O executable format.
